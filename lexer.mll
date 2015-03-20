@@ -27,6 +27,8 @@
   let reserved_words = [
   (* Keywords *)
   ("null", NULL);
+  ("true", TRUE);
+  ("false", FALSE);
   ("void", TVOID);
   ("int", TINT);
   ("string", TSTRING);
@@ -114,6 +116,7 @@ rule token = parse
   | eof { EOF }
 
   | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf }
+  | "{" { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; arrays 0 [] lexbuf }
   | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
   | '#' { let p = lexeme_start_p lexbuf in
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
@@ -157,6 +160,17 @@ and directive state = parse
                 Printf.sprintf "Illegal directives")) }
   | _ { raise (Lexer_error (lex_long_range lexbuf, 
           Printf.sprintf "Illegal directives")) }
+
+
+and arrays level lst = parse
+  | '}'  {ARRAY(lst)}
+  | whitespace+ { arrays level lst lexbuf}
+  | ',' { arrays level lst lexbuf}
+  | lowercase (digit | character | '_')+ {arrays level (List.append lst [(Ast.no_loc
+  (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
+  | digit+ { arrays level (List.append lst [(Ast.no_loc
+  (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
+  | _ {ARRAY(lst)}
 
 and comments level = parse
   | "*/" { if level = 0 then token lexbuf

@@ -8,25 +8,49 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 
 /* Declare your tokens here. */
 %token EOF
-%token <int64>  INT
+%token <int64> INT
 %token NULL
 %token <string> STRING
+%token <Ast.const list> ARRAY
+%token TRUE
+%token FALSE
 %token <string> IDENT
+
 %token TINT     /* int */
 %token TVOID    /* void */
 %token TSTRING  /* string */
+%token TBOOL    /* bool */
+%token TARRAY   /* array */
+
 %token IF       /* if */
 %token ELSE     /* else */
 %token WHILE    /* while */
+%token FOR      /* for */
+%token NEW      /* new */
 %token RETURN   /* return */
 %token SEMI     /* ; */
 %token COMMA    /* , */
 %token LBRACE   /* { */
 %token RBRACE   /* } */
+
+%token STAR     /* * */
 %token PLUS     /* + */
 %token DASH     /* - */
-%token STAR     /* * */
+%token LLSHIFT  /* << */
+%token RLSHIFT  /* >> */
+%token ARSHIFT  /* >>> */
+%token LESS     /* < */
+%token LESSEQ   /* <= */
+%token GREAT    /* > */
+%token GREATEQ  /* >= */
 %token EQEQ     /* == */
+%token NOTEQ    /* != */
+%token LAND     /* & */
+%token LOR      /* | */
+%token BAND     /* [&] */
+%token BOR      /* [|] */
+
+
 %token EQ       /* = */
 %token LPAREN   /* ( */
 %token RPAREN   /* ) */
@@ -110,8 +134,11 @@ reft:
 
 const:
   | NULL     { loc $startpos $endpos CNull } 
+  | TRUE     { loc $startpos $endpos @@ CBool true } 
+  | FALSE     { loc $startpos $endpos @@ CBool false} 
   | i=INT    { loc $startpos $endpos @@ CInt i }
   | s=STRING { loc $startpos $endpos @@ CStr s } 
+  | a=ARRAY { loc $startpos $endpos @@ CArr a }
 
 %inline bop:
   | PLUS { Add }
