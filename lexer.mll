@@ -108,6 +108,7 @@ let newline = '\n' | ('\r' '\n') | '\r'
 let lowercase = ['a'-'z']
 let uppercase = ['A'-'Z']
 let character = uppercase | lowercase
+let boolean = "false" | "true"
 let whitespace = ['\t' ' ']
 let digit = ['0'-'9']
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
@@ -166,7 +167,9 @@ and arrays level lst = parse
   | '}'  {ARRAY(lst)}
   | whitespace+ { arrays level lst lexbuf}
   | ',' { arrays level lst lexbuf}
-  | lowercase (digit | character | '_')+ {arrays level (List.append lst [(Ast.no_loc
+  | "null" {arrays level (List.append lst [(Ast.no_loc
+  (Ast.CNull))]) lexbuf}
+  | boolean {arrays level (List.append lst [(Ast.no_loc
   (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
   | digit+ { arrays level (List.append lst [(Ast.no_loc
   (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
