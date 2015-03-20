@@ -4,3 +4,4 @@
 !lexer.mll
 !parser.mly
 !frontend.ml
+!providedtests.ml
