@@ -20,7 +20,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token TVOID    /* void */
 %token TSTRING  /* string */
 %token TBOOL    /* bool */
-%token TARRAY   /* array */
+%token TINTARRAY   /* array */
 
 %token IF       /* if */
 %token ELSE     /* else */
@@ -32,19 +32,20 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token COMMA    /* , */
 %token LBRACE   /* { */
 %token RBRACE   /* } */
+%token ASSIGN   /* => */
 
 %token STAR     /* * */
 %token PLUS     /* + */
 %token DASH     /* - */
 %token LLSHIFT  /* << */
-%token RLSHIFT  /* >> */
+%token LRSHIFT  /* >> */
 %token ARSHIFT  /* >>> */
 %token LESS     /* < */
 %token LESSEQ   /* <= */
 %token GREAT    /* > */
 %token GREATEQ  /* >= */
 %token EQEQ     /* == */
-%token NOTEQ    /* != */
+%token NEQ    /* != */
 %token LAND     /* & */
 %token LOR      /* | */
 %token BAND     /* [&] */
@@ -60,7 +61,16 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token BANG     /* ! */
 
                        
-
+%left BOR
+%left BAND
+%left LOR
+%left LAND
+%left EQEQ NEQ
+%left GREAT
+%left GREATEQ
+%left LESS
+%left LESSEQ
+%left LLSHIFT LRSHIFT ARSHIFT
 %left PLUS DASH
 %left STAR
 %nonassoc BANG
@@ -121,11 +131,12 @@ decl:
 
 typ:
   | TINT  { loc $startpos $endpos TInt }
-
+  | TBOOL  { loc $startpos $endpos TBool }
   | r=reft { loc $startpos $endpos @@ TRef r }
 
 reft:
   | TSTRING { loc $startpos $endpos RString }
+  | TINTARRAY { loc $startpos $endpos @@ RArray (loc $startpos $endpos TInt) }
 
 
 %inline rtyp:
@@ -145,7 +156,18 @@ const:
   | DASH { Sub }
   | STAR { Mul }
   | EQEQ { Eq }
-
+  | NEQ { Neq }
+  | LAND { And }
+  | LOR { Or }
+  | LESS { Lt }
+  | LESSEQ { Lte }
+  | GREAT { Gt }
+  | GREATEQ { Gte }
+  | LLSHIFT { Shl }
+  | LRSHIFT { Shr }
+  | ARSHIFT { Sar }
+  | BOR { IOr }
+  | BAND { IAnd }
 
 %inline uop:
   | DASH { Neg }
@@ -157,8 +179,10 @@ exp:
   | u=uop e=exp         { loc $startpos $endpos @@ Uop (u, e) }
   | c=const { loc $startpos $endpos @@ Const c }
   | p=path  { loc $startpos $endpos @@ Path p }
-
+  | NEW t=typ LBRACKET e1=exp RBRACKET LBRACE id=ident ASSIGN e2=exp RBRACE 
+  {loc $startpos $endpos @@ NewArr (t,e1,id,e2)}
   | LPAREN e=exp RPAREN { e } 
+
 
 path:
   | id=ident s=suffixpath

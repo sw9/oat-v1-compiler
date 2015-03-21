@@ -23,7 +23,9 @@ let parse_consts =
 
 let exp_test code ast = parse_test Parser.exp_top eq_exp code ast
 
-let parse_exp_tests = []
+let parse_exp_tests = [("parse exp test 19", exp_test "new int[3]{ i => i}"
+(no_loc (NewArr (no_loc (TInt),no_loc (Const (no_loc (CInt 3L))),no_loc
+("i"),no_loc (Path ([ no_loc (Field (no_loc ("i"))) ]))))))]
 
 let stmt_test code ast = parse_test Parser.stmt_top eq_stmt code ast
 
