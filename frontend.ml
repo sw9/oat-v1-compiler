@@ -428,7 +428,7 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
     begin match init.elt with
       | Const x ->
         begin match x.elt with
-          | CStr s -> Ptr (Array ((String.length s), I8))
+          | CStr s -> Ptr (Ptr (Array ((String.length s), I8)))
           | CArr a -> failwith "unimplemented"
           | _ -> cmp_typ ty
         end
