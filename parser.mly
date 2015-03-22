@@ -15,12 +15,12 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token TRUE
 %token FALSE
 %token <string> IDENT
+%token <Ast.typ>TARRAY   /* array */
 
 %token TINT     /* int */
 %token TVOID    /* void */
 %token TSTRING  /* string */
 %token TBOOL    /* bool */
-%token TINTARRAY   /* array */
 
 %token IF       /* if */
 %token ELSE     /* else */
@@ -136,7 +136,7 @@ typ:
 
 reft:
   | TSTRING { loc $startpos $endpos RString }
-  | TINTARRAY { loc $startpos $endpos @@ RArray (loc $startpos $endpos TInt) }
+  | t=TARRAY { loc $startpos $endpos @@ RArray t }
 
 
 %inline rtyp:
@@ -179,7 +179,7 @@ exp:
   | u=uop e=exp         { loc $startpos $endpos @@ Uop (u, e) }
   | c=const { loc $startpos $endpos @@ Const c }
   | p=path  { loc $startpos $endpos @@ Path p }
-  | NEW t=typ LBRACKET e1=exp RBRACKET LBRACE id=ident ASSIGN e2=exp RBRACE 
+  | NEW t=typ LBRACKET? e1=exp RBRACKET LBRACE id=ident ASSIGN e2=exp RBRACE 
   {loc $startpos $endpos @@ NewArr (t,e1,id,e2)}
   | LPAREN e=exp RPAREN { e } 
 
@@ -204,6 +204,8 @@ stmt:
   | RETURN SEMI           { loc $startpos $endpos @@ Ret(None) }
   | RETURN e=exp SEMI     { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  { loc $startpos $endpos @@ While(e, b) }
+  | FOR LPAREN SEMI* d=list(decl) SEMI e=exp SEMI s=stmt SEMI* RPAREN b=block  { loc $startpos
+  $endpos @@ For(d, Some e, Some s, b) }
 
 
 if_stmt:

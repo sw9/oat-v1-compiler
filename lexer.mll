@@ -84,7 +84,6 @@ let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
   let string_buffer = ref (String.create 2048)
   let string_end = ref 0
   let start_lex = ref (Range.start_of_range Range.norange)
-  let mode = ref 0
 
   let start_pos_of_lexbuf lexbuf : pos =
     (Range.pos_of_lexpos (lexeme_start_p lexbuf))
@@ -117,6 +116,9 @@ let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
 
   (* Lexing directives *)
   let lnum = ref 1
+  let mode = ref 0
+  let counter= ref 0
+  let scounter = ref 0
 }
 
 (* Declare your aliases (let foo = regex) and rules here. *)
@@ -127,42 +129,65 @@ let character = uppercase | lowercase
 let boolean = "false" | "true"
 let whitespace = ['\t' ' ']
 let intarr = "int"(whitespace)*"[]"
+let stringarr = "string"(whitespace)*"[]"
+let boolarr = "bool"(whitespace)*"[]"
 let digit = ['0'-'9']
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
 
 rule token = parse
-  | eof { EOF }
-
+  | eof { mode:=0;EOF }
+  | ';' { mode:=1;create_token lexbuf}
   | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf }
   | "{" { if !mode = 0 then 
-      begin reset_str(); start_lex := start_pos_of_lexbuf lexbuf; array 0 []
-      lexbuf end
-      else create_token lexbuf}
-  | "}" {if !mode <> 0 then begin
-      mode:= (!mode-1); create_token lexbuf end else create_token lexbuf}
-  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
+      begin reset_str(); counter := (!counter+1); start_lex := start_pos_of_lexbuf lexbuf; array 0 [] lexbuf end
+  else begin scounter:=(!scounter+1); create_token lexbuf end}
+  | "}" 
+  {if !mode <> 0 then begin
+      scounter:= (!scounter-1); create_token lexbuf 
+  end 
+  else begin
+      counter:=(!counter-1); if !counter = 0 then mode:=1; create_token lexbuf
+  end}
+  | '"' { mode:=1; reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
   | '#' { let p = lexeme_start_p lexbuf in
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
           else raise (Lexer_error (lex_long_range lexbuf,
             Printf.sprintf "# can only be the 1st char in a line.")) }
 
-  | "new" {mode:= (!mode + 1); create_token lexbuf}
-  | "int" {TINT}
-  | intarr {TINTARRAY} 
-  | "string" {TSTRING}
-  | "bool" {TBOOL}
-  | "void" {TVOID}
-  | lowercase (digit | character | '_')* { create_token lexbuf }
-  | digit+ | "0x" hexdigit+ { INT (Int64.of_string (lexeme lexbuf)) }
+  | intarr {mode:=1; TARRAY(multiarray (Ast.no_loc Ast.TInt) lexbuf)} 
+  | boolarr {mode:=1; TARRAY(multiarray (Ast.no_loc Ast.TBool) lexbuf)} 
+  | stringarr {mode:=1; TARRAY(multiarray (Ast.no_loc (Ast.TRef (Ast.no_loc Ast.RString))) lexbuf)} 
+  
+  | "int" {mode:=1; TINT}
+  | "string" {mode:=1; TSTRING}
+  | "bool" {mode:=1; TBOOL}
+  | "void" {mode:=1; TVOID}
+  
+  | "new" {mode:= 1; create_token lexbuf}
+  | "if" {mode:= 1; create_token lexbuf}
+  | "while" {mode:= 1; create_token lexbuf}
+  | "for" {mode:= 1; create_token lexbuf}
+  
+  | lowercase (digit | character | '_')* { mode:=1; create_token lexbuf }
+  | digit+ | "0x" hexdigit+ { mode:=1; INT (Int64.of_string (lexeme lexbuf)) }
   | whitespace+ { token lexbuf }
   | newline { newline lexbuf; token lexbuf }
-  | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
+
+  | "=" {mode:=0; create_token lexbuf}
+  
+  | ';' | ',' | '+' | '-' | '*' | '=' | "==" 
   | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | '&' | '|' 
   | '<' | "<=" | '>' | ">=" | "<<" | ">>" | ">>>" | "[&]"
   | "[|]" | "=>" 
-    { create_token lexbuf }
+  { mode:=1; create_token lexbuf }
 
   | _ as c { unexpected_char lexbuf c }
+
+and multiarray typ = parse
+  | whitespace+ { typ } 
+  | "[]" {multiarray (Ast.no_loc (Ast.TRef (Ast.no_loc (Ast.RArray typ)))) lexbuf}
+  | "[" {typ}
+  
 
 and directive state = parse
   | whitespace+ { directive state lexbuf } 
