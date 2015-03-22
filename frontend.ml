@@ -424,8 +424,62 @@ let fdecl_typ {elt={rtyp; name; args}} : id * funs_binding =
    type information about all of the declarations.  
 
    Use gvdecl_typ and gfdecl_typ to complete this function.                   *)
+
 let cmp_global_ctxt (p:Ast.prog) (c:ctxt) : ctxt * ll_globals =
-  failwith "cmp_global_ctxt unimplemented"
+  
+  let gvll  (x: gdecl) =
+    begin match x with
+    | Gvdecl d ->
+      let ret = gvdecl_typ d in
+      begin match ret with
+        | (_, x) -> x
+      end
+    | Gfdecl f  -> []
+    end
+  in
+
+  let gvctxt  (x: gdecl) =
+    begin match x with
+    | Gvdecl d ->
+      let ret = gvdecl_typ  d in
+
+      begin match ret with
+        | (x, _) -> 
+          let str = begin match x with 
+          | (s, _) -> s.elt
+          end in
+
+          let vars = begin match x with 
+            | (_, v) -> v
+          end in
+
+          [(str,vars)]
+      end
+    | Gfdecl f  -> []
+    end
+  in
+
+  let gfctxt  (x: gdecl) =
+    begin match x with
+    | Gvdecl d -> []
+    | Gfdecl f  ->
+      let ret = fdecl_typ  f in
+      let str = begin match ret with
+        | (s, _) -> s.elt
+      end in
+      
+      let funs = begin match ret with
+        | (_, y) -> y
+      end in
+      [(str, funs)]
+    end
+  in
+  
+  let llglob =  List.flatten (List.map gvll p) in
+  let globvar =  List.flatten (List.map gvctxt p) in
+  let globfun =  List.flatten (List.map gfctxt p) in
+  let retctxt = {funs = (List.append globfun c.funs); global = (List.append globvar c.global); local = c.local} in
+  (retctxt, llglob)
 
 (* Oat initial context ------------------------------------------------------ *)
 
