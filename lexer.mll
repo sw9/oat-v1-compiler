@@ -32,10 +32,12 @@
   ("void", TVOID);
   ("int", TINT);
   ("string", TSTRING);
+  ("bool", TBOOL);
   ("else", ELSE);
   ("if", IF);
   ("while", WHILE);
   ("return", RETURN);
+  ("new", NEW);
 
   (* Symbols *)
   ( ";", SEMI);
@@ -47,12 +49,25 @@
   ( "*", STAR);
   ( "=", EQ);
   ( "==", EQEQ);
+  ( "!=", NEQ);
+  ( "&", LAND);
+  ( "[&]", BAND);
+  ( "|", LOR);
+  ( "[|]", BOR);
   ( "!", BANG);
   ( "~", TILDE);
   ( "(", LPAREN);
   ( ")", RPAREN);
   ( "[", LBRACKET);
   ( "]", RBRACKET);
+  ( "<", LESS);
+  ( "<=", LESSEQ);
+  ( ">", GREAT);
+  ( ">=", GREATEQ);
+  ( ">>", LRSHIFT);
+  ( ">>>", ARSHIFT);
+  ( "<<", LLSHIFT);
+  ( "=>", ASSIGN);
   
   ]
 
@@ -101,6 +116,9 @@ let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
 
   (* Lexing directives *)
   let lnum = ref 1
+  let mode = ref 0
+  let counter= ref 0
+  let scounter = ref 0
 }
 
 (* Declare your aliases (let foo = regex) and rules here. *)
@@ -110,30 +128,66 @@ let uppercase = ['A'-'Z']
 let character = uppercase | lowercase
 let boolean = "false" | "true"
 let whitespace = ['\t' ' ']
+let intarr = "int"(whitespace)*"[]"
+let stringarr = "string"(whitespace)*"[]"
+let boolarr = "bool"(whitespace)*"[]"
 let digit = ['0'-'9']
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
 
 rule token = parse
-  | eof { EOF }
-
+  | eof { mode:=0;EOF }
+  | ';' { mode:=1;create_token lexbuf}
   | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf }
-  | "{" { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; arrays 0 [] lexbuf }
-  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
+  | "{" { if !mode = 0 then 
+      begin reset_str(); counter := (!counter+1); start_lex := start_pos_of_lexbuf lexbuf; array 0 [] lexbuf end
+  else begin scounter:=(!scounter+1); create_token lexbuf end}
+  | "}" 
+  {if !mode <> 0 then begin
+      scounter:= (!scounter-1); create_token lexbuf 
+  end 
+  else begin
+      counter:=(!counter-1); if !counter = 0 then mode:=1; create_token lexbuf
+  end}
+  | '"' { mode:=1; reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
   | '#' { let p = lexeme_start_p lexbuf in
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
           else raise (Lexer_error (lex_long_range lexbuf,
             Printf.sprintf "# can only be the 1st char in a line.")) }
 
-  | lowercase (digit | character | '_')* { create_token lexbuf }
-  | digit+ | "0x" hexdigit+ { INT (Int64.of_string (lexeme lexbuf)) }
+  | intarr {mode:=1; TARRAY(multiarray (Ast.no_loc Ast.TInt) lexbuf)} 
+  | boolarr {mode:=1; TARRAY(multiarray (Ast.no_loc Ast.TBool) lexbuf)} 
+  | stringarr {mode:=1; TARRAY(multiarray (Ast.no_loc (Ast.TRef (Ast.no_loc Ast.RString))) lexbuf)} 
+  
+  | "int" {mode:=1; TINT}
+  | "string" {mode:=1; TSTRING}
+  | "bool" {mode:=1; TBOOL}
+  | "void" {mode:=1; TVOID}
+  
+  | "new" {mode:= 1; create_token lexbuf}
+  | "if" {mode:= 1; create_token lexbuf}
+  | "while" {mode:= 1; create_token lexbuf}
+  | "for" {mode:= 1; create_token lexbuf}
+  
+  | lowercase (digit | character | '_')* { mode:=1; create_token lexbuf }
+  | digit+ | "0x" hexdigit+ { mode:=1; INT (Int64.of_string (lexeme lexbuf)) }
   | whitespace+ { token lexbuf }
   | newline { newline lexbuf; token lexbuf }
 
-  | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
-  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' 
-    { create_token lexbuf }
+  | "=" {mode:=0; create_token lexbuf}
+  
+  | ';' | ',' | '+' | '-' | '*' | '=' | "==" 
+  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | '&' | '|' 
+  | '<' | "<=" | '>' | ">=" | "<<" | ">>" | ">>>" | "[&]"
+  | "[|]" | "=>" 
+  { mode:=1; create_token lexbuf }
 
   | _ as c { unexpected_char lexbuf c }
+
+and multiarray typ = parse
+  | whitespace+ { typ } 
+  | "[]" {multiarray (Ast.no_loc (Ast.TRef (Ast.no_loc (Ast.RArray typ)))) lexbuf}
+  | "[" {typ}
+  
 
 and directive state = parse
   | whitespace+ { directive state lexbuf } 
@@ -163,8 +217,25 @@ and directive state = parse
           Printf.sprintf "Illegal directives")) }
 
 
+and array level lst = parse
+  | '}' {ARRAY(lst)}
+  | '{' {array level (List.append lst [(Ast.no_loc
+  (Ast.CArr(arrays (level+1) [] lexbuf)))]) lexbuf}
+  | whitespace+ { array level lst lexbuf}
+  | ',' { array level lst lexbuf}
+  | "null" {array level (List.append lst [(Ast.no_loc
+  (Ast.CNull))]) lexbuf}
+  | boolean {array level (List.append lst [(Ast.no_loc
+  (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
+  | digit+ { array level (List.append lst [(Ast.no_loc
+  (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
+  | _ {ARRAY(lst)}
+
+
 and arrays level lst = parse
-  | '}'  {ARRAY(lst)}
+  | '}' {lst}
+  | '{' {arrays level (List.append lst [(Ast.no_loc
+  (Ast.CArr(arrays (level+1) [] lexbuf)))]) lexbuf}
   | whitespace+ { arrays level lst lexbuf}
   | ',' { arrays level lst lexbuf}
   | "null" {arrays level (List.append lst [(Ast.no_loc
@@ -173,7 +244,12 @@ and arrays level lst = parse
   (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
   | digit+ { arrays level (List.append lst [(Ast.no_loc
   (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
-  | _ {ARRAY(lst)}
+  | _ {lst}
+
+
+  | _ { raise (Lexer_error (lex_long_range lexbuf, 
+          Printf.sprintf "Illegal new arrays")) }
+
 
 and comments level = parse
   | "*/" { if level = 0 then token lexbuf

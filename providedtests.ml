@@ -15,15 +15,31 @@ let parse_test parse compare code ast =
   let lexbuf = Lexing.from_string code in
   assert_eq_ast compare ast (fun () -> (parse Lexer.token lexbuf))
 
+let exp_test code ast = parse_test Parser.exp_top eq_exp code ast
+let stmt_test code ast = parse_test Parser.stmt_top eq_stmt code ast
+
 let parse_consts =
   [("self parse consts test one", parse_test Parser.const eq_const "{true, true, false}" (no_loc (CArr [no_loc (CBool true); no_loc (CBool true); no_loc (CBool false)])))
   ; ("self parse consts test two", parse_test Parser.const eq_const "{null, null, null}"
       (no_loc (CArr [no_loc (CNull); no_loc (CNull); no_loc (CNull)])))
+
+  ; ("parse exp test one", exp_test "new string[3]{ i => i}" (no_loc (NewArr
+  (no_loc (TRef (no_loc (RString))),no_loc (Const (no_loc (CInt 3L))),no_loc ("i"),no_loc (Path ([ no_loc (Field (no_loc ("i"))) ]))))))
+  
+
+  ; ("parse exp test two", exp_test "new int[][][3]{ i => new int[2]{ i => 0 }}" (no_loc (NewArr (no_loc (TRef (no_loc ((RArray (no_loc (TRef (no_loc ((RArray (no_loc (TInt))))))))))),no_loc (Const (no_loc (CInt 3L))),no_loc ("i"),no_loc (NewArr (no_loc (TInt),no_loc (Const (no_loc (CInt 2L))),no_loc ("i"),no_loc (Const (no_loc (CInt 0L)))))))))
+  
+  ; ("parse stmt test 9", stmt_test "if(j<n){}" (no_loc
+  (If (no_loc (Bop (Lt,no_loc (Path ([ no_loc (Field (no_loc ("j"))) ])),no_loc
+  (Path ([ no_loc (Field (no_loc ("n"))) ])))),[],[  ]))))
+  
+  
   ]
 
-let exp_test code ast = parse_test Parser.exp_top eq_exp code ast
 
-let parse_exp_tests = []
+let parse_exp_tests = [("parse exp test 19", exp_test "new int[3]{ i => i}"
+(no_loc (NewArr (no_loc (TInt),no_loc (Const (no_loc (CInt 3L))),no_loc
+("i"),no_loc (Path ([ no_loc (Field (no_loc ("i"))) ]))))))]
 
 let stmt_test code ast = parse_test Parser.stmt_top eq_stmt code ast
 
