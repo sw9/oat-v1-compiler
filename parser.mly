@@ -204,7 +204,7 @@ stmt:
   | RETURN SEMI           { loc $startpos $endpos @@ Ret(None) }
   | RETURN e=exp SEMI     { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  { loc $startpos $endpos @@ While(e, b) }
-  | FOR LPAREN SEMI* d=list(decl)  SEMI* e=exp SEMI* s=stmt SEMI* RPAREN b=block  { loc $startpos
+  | FOR LPAREN SEMI* d=list(decl)  SEMI* e=exp SEMI s=stmt SEMI* RPAREN b=block  { loc $startpos
   $endpos @@ For(d, Some e, Some s, b) }
 
 
