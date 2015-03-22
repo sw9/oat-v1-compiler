@@ -364,7 +364,12 @@ type ll_globals = (Ll.gid * Ll.gdecl) list
      created by build_cfg                                                     *)
 let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (Ll.gid * Ll.fdecl) * ll_globals =
-  failwith "cmp_fdecl not implemented"
+      let g = name in
+      let (ft,_) = (List.split args)
+      let new_c = (add_function c (Ast.no_loc name) (g,(ft, rtyp))) in 
+
+
+let build_cfg (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
 
 (* compile all of the fdecls ------------------------------------------------ *)
 let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
