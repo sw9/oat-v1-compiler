@@ -370,18 +370,26 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
 let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
   failwith "cmp_fdecls not implemented"
 
+
 (* compile a global initializer --------------------------------------------- *)
 
 (* Invariant: ty is the source type of the global value.  init is a
    _constant_ expression.  Outputs the target type, which should be
-   (cmp_typ ty), the corresponding ginit_value, which must have type
-   Ptr (cmp_typ ty), and ll_globals that initialize the
+   correspond to the ginit_value, and ll_globals that initialize the
    statically-allocated memory block correctly.
 
    Unlike constant expressions that appear inside of functions (which
    require dynamic allocation of storage space), globally defined
    constants should simply translate to a sequence of appropriate LL 
    global initializers.  
+
+   - for Null, Bool, and Int types the result type is simply 
+     (cmp_tmp ty)
+   
+   - for String and Array types the resulting Ll.ty should correspond
+     exactly to the ginit value's type, which may be more specific
+     than (cmp_typ ty).  (Hint: the clang compiler's type errors
+     can help you figure yout the exact types of the ginit values.)
 
    - global string declarations must translate to a global string
      constant, plus a reference to that constant.
@@ -395,9 +403,39 @@ let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
    - this function should fail if the initializer expression has
      incorrect type, or if the global initializer contains a
      non-constant expression.                                                 *)
-let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
-  failwith "cmp_init not implemented"
 
+let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
+  let const_id = gensym "constant" in
+  let c =
+    begin match init.elt with
+      | Const x ->
+        begin match x.elt with
+          | CNull -> GNull
+          | CBool b -> 
+            begin match b with
+              | true -> GInt 0L
+              | false -> GInt 1L
+            end
+          | CInt i -> GInt i
+          | CStr s -> GString s
+          | CArr a -> failwith "unimplemented"
+         end
+      | _ -> failwith "non-constant expression"
+    end in
+  let gid = const_id in
+
+  let typ =
+    begin match init.elt with
+      | Const x ->
+        begin match x.elt with
+          | CStr s -> Ptr (Array ((String.length s), I8))
+          | CArr a -> failwith "unimplemented"
+          | _ -> cmp_typ ty
+        end
+      | _ -> failwith "non-constant expression"
+    end in
+
+  (typ, GGid gid, [(gid, (typ, c))])
 
 (* compile the global context ----------------------------------------------- *)
 
