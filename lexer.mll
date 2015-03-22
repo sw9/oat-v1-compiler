@@ -38,6 +38,7 @@
   ("while", WHILE);
   ("return", RETURN);
   ("new", NEW);
+  ("for", FOR);
 
   (* Symbols *)
   ( ";", SEMI);
@@ -179,7 +180,7 @@ rule token = parse
   | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | '&' | '|' 
   | '<' | "<=" | '>' | ">=" | "<<" | ">>" | ">>>" | "[&]"
   | "[|]" | "=>" 
-  { mode:=1; create_token lexbuf }
+  { create_token lexbuf }
 
   | _ as c { unexpected_char lexbuf c }
 
