@@ -19,42 +19,28 @@ let exp_test code ast = parse_test Parser.exp_top eq_exp code ast
 let stmt_test code ast = parse_test Parser.stmt_top eq_stmt code ast
 
 let parse_consts =
-  [("self parse consts test one", parse_test Parser.const eq_const "{true, true, false}" (no_loc (CArr [no_loc (CBool true); no_loc (CBool true); no_loc (CBool false)])))
+  [("self parse consts test one", parse_test Parser.const eq_const "{true, true,
+  false}" (no_loc (CArr [no_loc (CBool true); no_loc (CBool true); no_loc (CBool false)])))
   ; ("self parse consts test two", parse_test Parser.const eq_const "{null, null, null}"
       (no_loc (CArr [no_loc (CNull); no_loc (CNull); no_loc (CNull)])))
-
   ; ("parse exp test one", exp_test "new string[3]{ i => i}" (no_loc (NewArr
   (no_loc (TRef (no_loc (RString))),no_loc (Const (no_loc (CInt 3L))),no_loc ("i"),no_loc (Path ([ no_loc (Field (no_loc ("i"))) ]))))))
-  
-
   ; ("parse exp test two", exp_test "new int[][][3]{ i => new int[2]{ i => 0 }}" (no_loc (NewArr (no_loc (TRef (no_loc ((RArray (no_loc (TRef (no_loc ((RArray (no_loc (TInt))))))))))),no_loc (Const (no_loc (CInt 3L))),no_loc ("i"),no_loc (NewArr (no_loc (TInt),no_loc (Const (no_loc (CInt 2L))),no_loc ("i"),no_loc (Const (no_loc (CInt 0L)))))))))
   
+  ;("parse consts test one", parse_test Parser.const eq_const "null" (no_loc CNull))
+  ; ("parse consts test two", parse_test Parser.const eq_const "42" (no_loc (CInt 42L)))
+  ; ("parse consts test three", parse_test Parser.const eq_const "true" (no_loc (CBool true)))
+  ; ("parse consts test four", parse_test Parser.const eq_const "false" (no_loc (CBool false)))
+  ; ("parse consts test seven", parse_test Parser.const eq_const "{1, 2, 3}"
+      (no_loc (CArr [no_loc (CInt 1L); no_loc (CInt 2L); no_loc (CInt 3L)])))
   ; ("parse stmt test 9", stmt_test "if(j<n){}" (no_loc
   (If (no_loc (Bop (Lt,no_loc (Path ([ no_loc (Field (no_loc ("j"))) ])),no_loc
   (Path ([ no_loc (Field (no_loc ("n"))) ])))),[],[  ]))))
   
-  
   ]
 
-
-let parse_exp_tests = [("parse exp test 19", exp_test "new int[3]{ i => i}"
-(no_loc (NewArr (no_loc (TInt),no_loc (Const (no_loc (CInt 3L))),no_loc
-("i"),no_loc (Path ([ no_loc (Field (no_loc ("i"))) ]))))))]
-
 let stmt_test code ast = parse_test Parser.stmt_top eq_stmt code ast
-
-let parse_stmt_tests = []
-
-let parse_file_test filepath ast =
-  assert_eq_ast Astlib.eq_prog ast (fun () -> Driver.parse_oat_file filepath)
-
-let parse_prog_tests =
-  []
-
 let parse_tests = parse_consts
-                @ parse_exp_tests
-                @ parse_stmt_tests
-                @ parse_prog_tests
 
 let oat_file_test path args =
   let _ = Platform.verb @@ Printf.sprintf "** Processing: %s\n" path in

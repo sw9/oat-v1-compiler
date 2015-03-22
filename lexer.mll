@@ -135,7 +135,7 @@ let digit = ['0'-'9']
 let hexdigit = ['0'-'9'] | ['a'-'f'] | ['A'-'F']
 
 rule token = parse
-  | eof { mode:=0;EOF }
+  | eof { mode:=0;counter:=0;scounter:=0;EOF }
   | ';' { mode:=1;create_token lexbuf}
   | "/*" { start_lex := start_pos_of_lexbuf lexbuf; comments 0 lexbuf }
   | "{" { if !mode = 0 then 
@@ -148,7 +148,7 @@ rule token = parse
   else begin
       counter:=(!counter-1); if !counter = 0 then mode:=1; create_token lexbuf
   end}
-  | '"' { mode:=1; reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
+  | '"' {  reset_str(); start_lex := start_pos_of_lexbuf lexbuf; string false lexbuf }
   | '#' { let p = lexeme_start_p lexbuf in
           if p.pos_cnum - p.pos_bol = 0 then directive 0 lexbuf 
           else raise (Lexer_error (lex_long_range lexbuf,
@@ -168,8 +168,8 @@ rule token = parse
   | "while" {mode:= 1; create_token lexbuf}
   | "for" {mode:= 1; create_token lexbuf}
   
-  | lowercase (digit | character | '_')* { mode:=1; create_token lexbuf }
-  | digit+ | "0x" hexdigit+ { mode:=1; INT (Int64.of_string (lexeme lexbuf)) }
+  | lowercase (digit | character | '_')* { create_token lexbuf }
+  | digit+ | "0x" hexdigit+ {  INT (Int64.of_string (lexeme lexbuf)) }
   | whitespace+ { token lexbuf }
   | newline { newline lexbuf; token lexbuf }
 
@@ -228,8 +228,11 @@ and array level lst = parse
   | boolean {array level (List.append lst [(Ast.no_loc
   (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
   | digit+ { array level (List.append lst [(Ast.no_loc
-  (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
-  | _ {ARRAY(lst)}
+  (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf} 
+  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf;
+  array level (List.append lst [(Ast.no_loc (str false lexbuf))]) lexbuf}
+  | newline { newline lexbuf; array level lst lexbuf }
+  | _ {print_string (lexeme lexbuf); ARRAY(lst)}
 
 
 and arrays level lst = parse
@@ -244,12 +247,10 @@ and arrays level lst = parse
   (Ast.CBool(bool_of_string(lexeme lexbuf))))]) lexbuf}
   | digit+ { arrays level (List.append lst [(Ast.no_loc
   (Ast.CInt(Int64.of_string(lexeme lexbuf))))]) lexbuf}
+  | '"' { reset_str(); start_lex := start_pos_of_lexbuf lexbuf;
+  arrays level (List.append lst [(Ast.no_loc (str false lexbuf))]) lexbuf}
+  | newline { newline lexbuf; arrays level lst lexbuf }
   | _ {lst}
-
-
-  | _ { raise (Lexer_error (lex_long_range lexbuf, 
-          Printf.sprintf "Illegal new arrays")) }
-
 
 and comments level = parse
   | "*/" { if level = 0 then token lexbuf
@@ -260,6 +261,15 @@ and comments level = parse
   | eof	 { raise (Lexer_error (lex_long_range lexbuf,
              Printf.sprintf "comments are not closed")) }
 
+
+and str in_directive = parse
+  | '"'  {(Ast.CStr (get_str()))}
+  | '\\' { add_str(escaped lexbuf); str in_directive lexbuf }
+  | '\n' { add_str '\n'; newline lexbuf; str in_directive lexbuf }
+  | eof  { raise (Lexer_error (lex_long_range lexbuf,
+             Printf.sprintf "String is not terminated")) }
+  | _    { add_str (Lexing.lexeme_char lexbuf 0); str in_directive lexbuf }
+         
 and string in_directive = parse
   | '"'  { if in_directive = false then
              STRING (get_str())
