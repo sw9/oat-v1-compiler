@@ -329,7 +329,18 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
      void function.  Note that this implies that the path has only one
      accessor.                                                                *)
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
-  failwith "cmp_stmt not implemented"
+    match stmt.elt with
+    | Ast.Ret t -> match t with
+               | Some c -> failwith "Not Implemented"
+               | None -> match rt with
+                         | Some _ -> failwith "void return type for non-void function"
+                         | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
+
+               
+    
+
+
+
 
 
 (* compile a block ---------------------------------------------------------- *)
@@ -364,12 +375,8 @@ type ll_globals = (Ll.gid * Ll.gdecl) list
      created by build_cfg                                                     *)
 let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (Ll.gid * Ll.fdecl) * ll_globals =
-      let g = name in
-      let (ft,_) = (List.split args)
-      let new_c = (add_function c (Ast.no_loc name) (g,(ft, rtyp))) in 
+      failwith "cmp_fdecl not implemented"
 
-
-let build_cfg (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
 
 (* compile all of the fdecls ------------------------------------------------ *)
 let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
