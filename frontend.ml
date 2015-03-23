@@ -364,12 +364,60 @@ type ll_globals = (Ll.gid * Ll.gdecl) list
      created by build_cfg                                                     *)
 let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (Ll.gid * Ll.fdecl) * ll_globals =
-  failwith "cmp_fdecl not implemented"
+
+  let func_id = gensym "function" in
+  
+  let rettyp = begin match rtyp with
+    | Some x ->
+       cmp_typ x
+    | None -> Void
+  end in
+  
+  let arg_typ  (x: typ * id) =
+    begin match x with
+      | (y, _) -> cmp_typ y
+    end in
+  
+  let arg_id  (x: typ * id) =
+    begin match x with
+      | (_, y) -> y.elt
+    end in
+
+  let arg_typs = List.map arg_typ args in
+  let func_fty = (arg_typs, rettyp) in
+  let func_param = List.map arg_id args in
+  
+  let new_ctxt, strm = cmp_block c rtyp body in
+  let func_cfg, func_llglobals = build_cfg strm in
+  let beginning_block, other_blocks = func_cfg in
+  
+  let block_insns = beginning_block.insns in
+  
+  let alloca_args  (x: typ * id) =
+    let alloca_id = gensym "alloca" in
+    begin match x with
+      | (x, y) ->
+        let uid = alloca_id in
+        (uid, (Alloca (cmp_typ x)))::(alloca_id, (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
+    end
+   in
+
+   let new_block = {insns=((List.flatten (List.map alloca_args args)) @ block_insns); terminator=beginning_block.terminator} in
+   let new_cfg = (new_block, other_blocks) in
+   ((name.elt, {fty=func_fty; param=func_param; cfg=new_cfg}), func_llglobals)
+                
 
 (* compile all of the fdecls ------------------------------------------------ *)
 let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
-  failwith "cmp_fdecls not implemented"
-
+  let f (x: gdecl) =
+    begin match x with
+      | Gvdecl y -> []
+      | Gfdecl y -> (cmp_fdecl c y) ::[]
+    end
+  in
+  
+  let x, y = List.split (List.flatten (List.map f p)) in
+  (x, (List.flatten y))
 
 (* compile a global initializer --------------------------------------------- *)
 
