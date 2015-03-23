@@ -185,6 +185,10 @@ let gep_array_len = [
   i64_op_of_int 0;  (* focus on the length component of the struct *)
 ]
 
+let ty_of_unop (uop:Ast.unop) : ty =
+    match uop with
+    | Ast.Neg _ | Ast.Bitnot _ -> (cmp_typ (Ast.no_loc Ast.TInt))
+    | Ast.Lognot _ -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 (* Generate a call to the runtime.c function oat_alloc_array.  t is
    the src type size is an i64 operand, the number of elements in the
@@ -233,7 +237,22 @@ let oat_alloc_array_static (t:Ast.typ) (n:int) : operand * stream=
 
 *)
 let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
-  failwith "cmp_const not implemented"
+    begin match cn.elt with
+    | Ast.CInt i -> 
+            if t.elt <> Ast.TInt then failwith "exp does not have
+            the correct source type"
+            else (cmp_typ t), (Ll.Const i), []
+    | Ast.CBool b ->
+            if t.elt <> Ast.TBool then failwith "exp does not have
+            the correct source type"
+            else (cmp_typ t), (i1_op_of_bool b), []
+
+    | Ast.CNull ->
+            match t.elt with
+            | Ast.TRef r -> (cmp_typ t), Ll.Null, []
+            | _ -> failwith "exp does not have the correct
+            source type"
+    end
 
 
 
@@ -251,8 +270,17 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 
    - see the description of path expressions below                            *)
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
-failwith "cmp_exp unimplemented"    
-
+    begin match exp.elt with
+    | Ast.Const c -> (cmp_const c t)
+    (*| Ast.Uop (uop,e) ->
+            let (op, code) = cmp_exp c e in
+            let (ans_id, ans_op) = gen_local_op (ty_of_unop uop) "unop" in
+            ((ans_op, code >::I (match uop with
+                                | Ast.Neg _ -> Binop (ans_id, Sub, i32_op_of_int 0, op)
+                                | Ast.Lognot _ -> Icmp  (ans_id, Eq, op, i1_op_of_bool false)
+                                | Ast.Not  _   -> Binop (ans_id, Xor, op, i32_op_of_int (-1)))))
+    *)
+    end
 
 (* Compile a path as a left-hand-side --------------------------------------- *)
 
@@ -331,7 +359,12 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     match stmt.elt with
     | Ast.Ret t -> match t with
-               | Some c -> failwith "Not Implemented"
+               | Some exp -> 
+                      begin match rt with
+                      | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
+                                  c, str @ [T(Ll.Ret(ty, Some op))]
+                      | None -> failwith "non-void return type for void function"
+                      end
                | None -> match rt with
                          | Some _ -> failwith "void return type for non-void function"
                          | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
