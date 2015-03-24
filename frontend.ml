@@ -166,6 +166,8 @@ let gensym : string -> string =
   let c = ref 0 in
   fun (s:string) -> incr c; Printf.sprintf "_%s%d" s (!c)
 
+let sym = gensym
+
 (* Compile Ocaml constants to LL IR constant operands of the right type.      *)
 let i1_op_of_bool b   = Ll.Const (if b then 1L else 0L)
 let i64_op_of_int i   = Ll.Const (Int64.of_int i)
@@ -272,14 +274,14 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
     begin match exp.elt with
     | Ast.Const c -> (cmp_const c t)
-    (*| Ast.Uop (uop,e) ->
-            let (op, code) = cmp_exp c e in
-            let (ans_id, ans_op) = gen_local_op (ty_of_unop uop) "unop" in
-            ((ans_op, code >::I (match uop with
-                                | Ast.Neg _ -> Binop (ans_id, Sub, i32_op_of_int 0, op)
-                                | Ast.Lognot _ -> Icmp  (ans_id, Eq, op, i1_op_of_bool false)
-                                | Ast.Not  _   -> Binop (ans_id, Xor, op, i32_op_of_int (-1)))))
-    *)
+    | Ast.Uop (uop,e) ->
+            let (ans_ty, op, code) = (cmp_exp c t e) in
+            let ans_id = (sym "unop") in
+            ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
+                                | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
+                                | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
+                                | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
+    
     end
 
 (* Compile a path as a left-hand-side --------------------------------------- *)
@@ -362,7 +364,11 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                | Some exp -> 
                       begin match rt with
                       | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
-                                  c, str @ [T(Ll.Ret(ty, Some op))]
+                                  begin match op with
+                                  | Id i ->
+                                          let nc = add_local c (no_loc i) (i,r) in
+                                          nc, str @ [T(Ll.Ret(ty, Some op))]
+                                  end
                       | None -> failwith "non-void return type for void function"
                       end
                | None -> match rt with
