@@ -45,7 +45,7 @@ let string_of_elt = function
    _reverse_ order when the stream is viewed as a list.  That is,
    instructions closer to the head of the list are to be executed
    later in the program.  That is because cons is more efficient than
-   append
+   appen
 
 
    To help make code generation easier, we define snoc (reverse cons)
@@ -398,16 +398,22 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
      void function.  Note that this implies that the path has only one
      accessor.                                                                *)
 
+and print_string_of_elt elt = 
+    let s = string_of_elt elt in
+    print_string s
+
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     match stmt.elt with
     | Ast.Ret t -> match t with
                | Some exp -> 
                       begin match rt with
                       | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
+                      List.iter (print_string_of_elt) str;
                                   begin match op with
                                   | Id i ->
                                           print_string i;
                                           let nc = add_local c (no_loc i) (i,r) in
+
                                           nc, str @ [T(Ll.Ret(ty, Some op))]
                                   | _ ->  c, str @ [T(Ll.Ret(ty, Some op))]
                                   end
