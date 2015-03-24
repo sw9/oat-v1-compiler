@@ -368,6 +368,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                                   | Id i ->
                                           let nc = add_local c (no_loc i) (i,r) in
                                           nc, str @ [T(Ll.Ret(ty, Some op))]
+                                  | _ ->  c, str @ [T(Ll.Ret(ty, Some op))]
                                   end
                       | None -> failwith "non-void return type for void function"
                       end
