@@ -271,16 +271,55 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
      iterator code for the array initializer
 
    - see the description of path expressions below                            *)
+
+let cmp_binop bop ty op1 op2 :  insn =
+    begin match bop with
+      | Ast.Add _  -> Ll.Binop (Add, ty, op1, op2)
+      | Ast.Mul _ -> Ll.Binop (Mul, ty, op1, op2)
+      | Ast.Sub _ -> Ll.Binop (Sub, ty, op1, op2)
+      | Ast.And _   -> Ll.Binop (And, ty, op1, op2)
+      | Ast.IAnd _  -> Ll.Binop (And, ty, op1, op2) 
+      | Ast.IOr _   -> Ll.Binop(Or, ty, op1, op2)
+      | Ast.Or _    -> Ll.Binop(Or, ty, op1, op2)
+      | Ast.Shl _   -> Ll.Binop(Shl, ty, op1, op2)
+      | Ast.Shr _   -> Ll.Binop(Lshr, ty, op1, op2)
+      | Ast.Sar _   -> Ll.Binop(Ashr, ty, op1, op2)
+      | Ast.Eq  _  -> Ll.Icmp(Eq, ty, op1, op2)
+      | Ast.Neq _  -> Ll.Icmp(Ne, ty, op1, op2)
+      | Ast.Lt  _  -> Ll.Icmp(Slt, ty, op1, op2)
+      | Ast.Lte _  -> Ll.Icmp(Sle, ty, op1, op2)
+      | Ast.Gt  _  -> Ll.Icmp(Sgt, ty, op1, op2)
+      | Ast.Gte _  -> Ll.Icmp(Sge, ty, op1, op2)
+     end
+
+let ty_of_bop bop : ty =
+    match bop with
+    | Ast.Add _  | Ast.Mul _ | Ast.Sub _ | Ast.Shl _ | Ast.Shr _ | Ast.Sar _
+    | Ast.IAnd _ | Ast.IOr _ -> (cmp_typ (Ast.no_loc Ast.TInt))
+    | Ast.Eq _ | Ast.Neq _ | Ast.Lt _ | Ast.Lte _ | Ast.Gt _ | Ast.Gte _ |
+    Ast.And _ | Ast.Or _ -> (cmp_typ (Ast.no_loc Ast.TBool))
+
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
     begin match exp.elt with
     | Ast.Const c -> (cmp_const c t)
     | Ast.Uop (uop,e) ->
             let (ans_ty, op, code) = (cmp_exp c t e) in
-            let ans_id = (sym "unop") in
+            let ans_id = (gensym "unop") in
+            print_string ans_id;
             ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
                                 | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
                                 | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
                                 | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
+    
+    | Ast.Bop (bop,e1,e2) -> 
+            let (ans_ty1, op1, code1) = (cmp_exp c t e1) in
+            let (ans_ty2, op2, code2) = (cmp_exp c t e1) in
+            let ans_id = (gensym "bop") in 
+            let my_ty = (ty_of_bop bop) in
+            if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
+            else 
+                ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
+                (cmp_binop bop my_ty op1 op2)))
     
     end
 
@@ -358,6 +397,7 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
    - If the statement is an SCall, it must be to a path identifying a 
      void function.  Note that this implies that the path has only one
      accessor.                                                                *)
+
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     match stmt.elt with
     | Ast.Ret t -> match t with
@@ -366,6 +406,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                       | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
                                   begin match op with
                                   | Id i ->
+                                          print_string i;
                                           let nc = add_local c (no_loc i) (i,r) in
                                           nc, str @ [T(Ll.Ret(ty, Some op))]
                                   | _ ->  c, str @ [T(Ll.Ret(ty, Some op))]
