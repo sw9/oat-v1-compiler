@@ -313,7 +313,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
     
     | Ast.Bop (bop,e1,e2) -> 
             let (ans_ty1, op1, code1) = (cmp_exp c t e1) in
-            let (ans_ty2, op2, code2) = (cmp_exp c t e1) in
+            let (ans_ty2, op2, code2) = (cmp_exp c t e2) in
             let ans_id = (gensym "bop") in 
             let my_ty = (ty_of_bop bop) in
             if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
