@@ -408,14 +408,12 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                | Some exp -> 
                       begin match rt with
                       | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
-                      List.iter (print_string_of_elt) str;
                                   begin match op with
                                   | Id i ->
                                           print_string i;
                                           let nc = add_local c (no_loc i) (i,r) in
-
-                                          nc, str @ [T(Ll.Ret(ty, Some op))]
-                                  | _ ->  c, str @ [T(Ll.Ret(ty, Some op))]
+                                          nc, str >@ [T(Ll.Ret(ty, Some op))]
+                                  | _ ->  c, str >@ [T(Ll.Ret(ty, Some op))]
                                   end
                       | None -> failwith "non-void return type for void function"
                       end
@@ -485,6 +483,7 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   let func_param = List.map arg_id args in
   
   let new_ctxt, strm = cmp_block c rtyp body in
+  List.iter (print_string_of_elt) strm;
   let func_cfg, func_llglobals = build_cfg strm in
   let beginning_block, other_blocks = func_cfg in
   
