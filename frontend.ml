@@ -412,10 +412,9 @@ type ll_globals = (Ll.gid * Ll.gdecl) list
 
    - the returned control flow graph and hoisted globals should be 
      created by build_cfg                                                     *)
+
 let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (Ll.gid * Ll.fdecl) * ll_globals =
-
-  let func_id = gensym "function" in
   
   let rettyp = begin match rtyp with
     | Some x ->
@@ -444,11 +443,10 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   let block_insns = beginning_block.insns in
   
   let alloca_args  (x: typ * id) =
-    let alloca_id = gensym "alloca" in
     begin match x with
       | (x, y) ->
-        let uid = alloca_id in
-        (uid, (Alloca (cmp_typ x)))::(alloca_id, (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
+        let uid = gensym "alloca" in
+        (uid, (Alloca (cmp_typ x)))::(gensym "alloca", (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
     end
    in
 
@@ -503,37 +501,34 @@ let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
      non-constant expression.                                                 *)
 
 let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
-  let const_id = gensym "constant" in
-  let c =
-    begin match init.elt with
-      | Const x ->
-        begin match x.elt with
-          | CNull -> GNull
-          | CBool b -> 
-            begin match b with
-              | true -> GInt 0L
-              | false -> GInt 1L
-            end
-          | CInt i -> GInt i
-          | CStr s -> GString s
-          | CArr a -> failwith "unimplemented"
-         end
-      | _ -> failwith "non-constant expression"
-    end in
-  let gid = const_id in
+  let gid = gensym "constant" in
 
   let typ =
     begin match init.elt with
       | Const x ->
         begin match x.elt with
-          | CStr s -> Ptr (Ptr (Array ((String.length s), I8)))
           | CArr a -> failwith "unimplemented"
           | _ -> cmp_typ ty
         end
       | _ -> failwith "non-constant expression"
     end in
 
-  (typ, GGid gid, [(gid, (typ, c))])
+  begin match init.elt with
+    | Const x ->
+      begin match x.elt with
+        | CNull -> (typ, GNull, [(gid, (typ, GNull))])
+        | CBool b -> 
+          begin match b with
+            | true -> (typ, (GInt 0L), [(gid, (typ, GInt 0L))])
+            | false -> (typ, GInt 1L, [(gid, (typ, GInt 1L))])
+          end
+        | CInt i -> (typ, GInt i, [(gid, (typ, GInt i))])
+        | CStr s -> let gid2 = gensym "constant" in
+          (Ptr (Array (String.length s + 1, I8)),  GGid gid, [(gid, (Array (String.length s + 1, I8),  GString s)); (gid2, (Ptr (Array (String.length s + 1, I8)),  GGid gid))])
+        | CArr a -> failwith "unimplemented"
+      end
+    | _ -> failwith "non-constant expression"
+  end
 
 (* compile the global context ----------------------------------------------- *)
 
