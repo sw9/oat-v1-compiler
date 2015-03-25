@@ -302,10 +302,13 @@ let ty_of_bop bop : ty =
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
     begin match exp.elt with
     | Ast.Const c -> (cmp_const c t)
+    | Ast.Path p -> 
+            let (ast_ty, op, code) = cmp_path_lhs c p in
+            ((cmp_typ t), op, code)
+
     | Ast.Uop (uop,e) ->
             let (ans_ty, op, code) = (cmp_exp c t e) in
             let ans_id = (gensym "unop") in
-            print_string ans_id;
             ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
                                 | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
                                 | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
@@ -320,6 +323,8 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
             else 
                 ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                 (cmp_binop bop my_ty op1 op2)))
+    
+            
     
     end
 
@@ -355,11 +360,15 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    must Bitcast the more specific type (found in the globals context) to
    the desired translation type.                                              *)
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-failwith "cmp_path_lhs not implemented"
+    begin match (List.nth p 0).elt with
+    | Field f -> let id = f.elt in
+                 let (uid, ty)  = (lookup_local id c) in
+                 (ty, Ll.Id uid, [])
+    | _ -> failwith "Index and Call not implemented"
+    end
 
 
 
-(* Compile a path as an expression ------------------------------------------ *)
 
 (* Checks that p is a valid path expression, meaning that it is either:
     -  just a well-typed call to a non-void function
@@ -404,22 +413,58 @@ and print_string_of_elt elt =
 
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     match stmt.elt with
-    | Ast.Ret t -> match t with
-               | Some exp -> 
-                      begin match rt with
-                      | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
-                                  begin match op with
-                                  | Id i ->
-                                          print_string i;
-                                          let nc = add_local c (no_loc i) (i,r) in
-                                          nc, str >@ [T(Ll.Ret(ty, Some op))]
-                                  | _ ->  c, str >@ [T(Ll.Ret(ty, Some op))]
-                                  end
-                      | None -> failwith "non-void return type for void function"
-                      end
-               | None -> match rt with
-                         | Some _ -> failwith "void return type for non-void function"
-                         | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
+    | Ast.Ret t -> print_endline ("");
+                   begin match t with
+                   | Some exp -> 
+                          begin match rt with
+                          | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
+                                      begin match op with
+                                      | Id i ->
+                                             (* let nc = add_local c (no_loc i)
+                                              * (i,r) in*)
+                                              c, str >@ [T(Ll.Ret(ty, Some op))]
+                                      | _ ->  c, str >@ [T(Ll.Ret(ty, Some op))]
+                                      end
+                          | None -> failwith "non-void return type for void function"
+                          end
+                   | None -> begin match rt with
+                             | Some _ -> failwith "void return type for non-void function"
+                             | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
+                             end
+                   end
+    
+    | Ast.Assn (p,e) -> print_endline "";
+                        failwith "Assn"
+
+    | Ast.Decl d -> print_endline "";
+                    let dec = d.elt in
+                    let lu = (List.mem_assoc dec.id.elt c.local) in
+                    begin match lu with
+                    | false -> let gu = (List.mem_assoc dec.id.elt c.global) in
+                               begin match gu with
+                               | false -> begin match rt with
+                                                  | Some r -> let (ty, op, str) = (cmp_exp c r dec.init) in
+                                                              begin match op with
+                                                              | Id i -> let nc = add_local c (dec.id) (dec.id.elt, r) in
+                                                                        let nc2 = add_local nc (no_loc i) (i, r) in
+                                                                        let uid = gensym "alloca" in
+                                                                        nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
+                                                                        [I(dec.id.elt,(Ll.Alloca ty))]>@ 
+                                                                        [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
+                                                              | _ ->    let nc = add_local c (dec.id) (dec.id.elt, r) in
+                                                                        let uid = gensym "alloca" in
+                                                                        nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
+                                                                        [I(dec.id.elt,(Ll.Alloca ty))]>@ 
+                                                                        [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
+                                                              end
+                                                               
+                                                  | None -> failwith "cannot init variable of type void" 
+                                                  end
+                               | _ -> failwith "Variable exists in global context"
+                               end
+                    | _ -> failwith "Variable exists in local context"
+                    end
+                     
 
                
     
