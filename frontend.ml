@@ -440,27 +440,23 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                     let dec = d.elt in
                     let lu = (List.mem_assoc dec.id.elt c.local) in
                     begin match lu with
-                    | false -> let gu = (List.mem_assoc dec.id.elt c.global) in
-                               begin match gu with
-                               | false -> begin match rt with
-                                                  | Some r -> let (ty, op, str) = (cmp_exp c r dec.init) in
-                                                              begin match op with
-                                                              | Id i -> let nc = add_local c (dec.id) (dec.id.elt, r) in
-                                                                        let nc2 = add_local nc (no_loc i) (i, r) in
-                                                                        let uid = gensym "alloca" in
-                                                                        nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
-                                                                        [I(dec.id.elt,(Ll.Alloca ty))]>@ 
-                                                                        [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
-                                                              | _ ->    let nc = add_local c (dec.id) (dec.id.elt, r) in
-                                                                        let uid = gensym "alloca" in
-                                                                        nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
-                                                                        [I(dec.id.elt,(Ll.Alloca ty))]>@ 
-                                                                        [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
-                                                              end
-                                                               
-                                                  | None -> failwith "cannot init variable of type void" 
-                                                  end
-                               | _ -> failwith "Variable exists in global context"
+                    | false -> begin match rt with
+                               | Some r -> let (ty, op, str) = (cmp_exp c r dec.init) in
+                                           begin match op with
+                                           | Id i -> let nc = add_local c (dec.id) (dec.id.elt, r) in
+                                                     let nc2 = add_local nc (no_loc i) (i, r) in
+                                                     let uid = gensym "alloca" in
+                                                     nc2, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
+                                                     [I(dec.id.elt,(Ll.Alloca ty))]>@ 
+                                                     [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
+                                           | _ ->    let nc = add_local c (dec.id) (dec.id.elt, r) in
+                                                     let uid = gensym "alloca" in
+                                                     nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
+                                                     [I(dec.id.elt,(Ll.Alloca ty))]>@ 
+                                                     [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
+                                           end
+                                           
+                               | None -> failwith "cannot init variable of type void" 
                                end
                     | _ -> failwith "Variable exists in local context"
                     end
