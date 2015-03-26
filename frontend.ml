@@ -494,6 +494,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     
 and condition c rt exp b1 b2 : stream =
     let _,e_b1 = cmp_block c rt b1 in
+    if List.length b2 <> 0 then begin
     let _,e_b2 = cmp_block c rt b2 in
     let if_label = (gensym "if") in
     let else_label = (gensym "else") in
@@ -503,6 +504,19 @@ and condition c rt exp b1 b2 : stream =
     [L if_label] >@ e_b1 >@ [T (Br merge_label)] >@ 
     [L else_label] >@ e_b2 >@ 
     [L merge_label]
+
+    end
+
+    else begin
+
+    let if_label = (gensym "if") in
+    let merge_label = (gensym "merge") in
+
+    [T (Cbr (exp, if_label, merge_label))] >@
+    [L if_label] >@ e_b1 >@ [T (Br merge_label)]>@ 
+    [L merge_label]
+    end
+
 
 
 
@@ -645,8 +659,8 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
         | CNull -> (typ, GNull, [(gid, (typ, GNull))])
         | CBool b -> 
           begin match b with
-            | true -> (typ, (GInt 0L), [(gid, (typ, GInt 0L))])
-            | false -> (typ, GInt 1L, [(gid, (typ, GInt 1L))])
+            | true -> (typ, (GInt 1L), [(gid, (typ, GInt 1L))])
+            | false -> (typ, GInt 0L, [(gid, (typ, GInt 0L))])
           end
         | CInt i -> (typ, GInt i, [(gid, (typ, GInt i))])
         | CStr s -> let gid2 = gensym "constant" in
