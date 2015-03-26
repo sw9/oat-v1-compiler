@@ -379,7 +379,7 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
           (ty, Ll.Id uid, [])
       end
 
-    | _ -> failwith "Index and Call not implemented"
+    | _ -> failwith "Index not implemented"
   end
 
 
@@ -410,7 +410,26 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   | Field id -> let ast_typ, op, str = cmp_path_lhs c p in
     let uid = (gensym "load") in
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
-  | Call (id, lst) -> failwith "unimplemented"
+  | Call (id, lst) -> 
+    let gid, (atyplst, rtyp) = lookup_function id.elt c in
+    let f (i: int)  (x: Ast.exp) =
+      let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
+      (ty, (op, str)) in
+    let typ_lst, temp  = List.split(List.mapi f lst) in
+    let op_lst, str_lst_lst = List.split temp in
+    let str_lst = List.flatten str_lst_lst in
+    let uid = gensym "call" in
+    let ll_rtyp =
+      match rtyp with
+      | None -> Void
+      | Some r -> cmp_typ r
+    in
+    let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
+    let ast_typ =
+      match rtyp with
+      | None -> failwith "can't have void function"
+      | Some r -> r in
+    (ast_typ, Id uid, str_lst >@ [call_elt])
   | _ -> failwith "invalid type for 0th element"
 
 
