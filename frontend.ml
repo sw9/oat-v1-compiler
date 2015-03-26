@@ -529,7 +529,7 @@ and ifloop c rt exp b1 b2 : stream =
 
     [T (Cbr (exp, if_label, else_label))] >@
     [L if_label] >@ e_b1 >@ [T (Br merge_label)] >@ 
-    [L else_label] >@ e_b2 >@ 
+    [L else_label] >@ e_b2 >@ [T (Br merge_label)] >@
     [L merge_label]
 
     end
