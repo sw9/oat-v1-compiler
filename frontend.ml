@@ -331,7 +331,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       (* if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
       else *)
         ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
-                                                            (cmp_binop bop ans_ty1 op1 op2)))
+        (cmp_binop bop ans_ty1 op1 op2)))
     | _ -> failwith "unimplemented"
   end
 
@@ -489,10 +489,8 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                           c, s1 >@ (ifloop c rt o1 b1 b2)
 
 
-  | Ast.While (e, b1) -> (* let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
-                          c, s1 >@ (whileloop c rt o1 b1) *) failwith
-                          "unimplemented"
-                      
+  | Ast.While (e, b1) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
+                          c,(whileloop c rt o1 b1 s1) 
 
   | Ast.Assn (p,e) ->
     let (t1, o1, s1) = (cmp_path_lhs c p) in
@@ -544,14 +542,21 @@ and ifloop c rt exp b1 b2 : stream =
     [L merge_label]
     end
 
-and whileloop c rt exp b1 : stream =
+and whileloop c rt exp b1 c1: stream =
   let _,e_b1 = cmp_block c rt b1 in
   let if_label = (gensym "if") in
-  let merge_label = (gensym "merge") in
+  let cond_label = (gensym "cond") in
+  let merge_label = (gensym "merge") in(*
+  [L cond_label] >@ c1 >@  
   [T (Cbr (exp, if_label, merge_label))] >@
-  [L if_label] >@ e_b1 >@ [T (Br if_label)]>@
-  [L merge_label]
-
+  [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@
+  [L merge_label]*)
+    [] >@
+    [T (Br (cond_label))] >@
+    [L cond_label]  >@ c1 >@
+    [T (Cbr (exp, if_label, merge_label))] >@
+    [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@ 
+    [L merge_label]
 
 
 
