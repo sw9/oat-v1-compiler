@@ -300,33 +300,31 @@ let ty_of_bop bop : ty =
     Ast.And _ | Ast.Or _ -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
-    begin match exp.elt with
+  begin match exp.elt with
     | Ast.Const c -> (cmp_const c t)
     | Ast.Path p -> 
-            let (ast_ty, op, code) = cmp_path_lhs c p in
-            ((cmp_typ t), op, code)
+      let (ast_ty, op, code) = cmp_path_exp c p in
+      ((cmp_typ t), op, code)
 
     | Ast.Uop (uop,e) ->
-            let (ans_ty, op, code) = (cmp_exp c t e) in
-            let ans_id = (gensym "unop") in
-            ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
-                                | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
-                                | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
-                                | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
-    
+      let (ans_ty, op, code) = (cmp_exp c t e) in
+      let ans_id = (gensym "unop") in
+      ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
+         | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
+         | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
+         | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
+
     | Ast.Bop (bop,e1,e2) -> 
-            let (ans_ty1, op1, code1) = (cmp_exp c t e1) in
-            let (ans_ty2, op2, code2) = (cmp_exp c t e2) in
-            let ans_id = (gensym "bop") in 
-            let my_ty = (ty_of_bop bop) in
-            if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
-            else 
-                ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
-                (cmp_binop bop my_ty op1 op2)))
-    
-            
-    
-    end
+      let (ans_ty1, op1, code1) = (cmp_exp c t e1) in
+      let (ans_ty2, op2, code2) = (cmp_exp c t e2) in
+      let ans_id = (gensym "bop") in 
+      let my_ty = (ty_of_bop bop) in
+      if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
+      else 
+        ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
+                                                            (cmp_binop bop my_ty op1 op2)))
+    | _ -> failwith "unimplemented"
+  end
 
 (* Compile a path as a left-hand-side --------------------------------------- *)
 
@@ -407,7 +405,13 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
    Note: if path is not just a call, you can compile it as a left-hand-side
    and the load from the resulting pointer.                                  *)
 and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  failwith "cmp_path_exp not implemented"
+  match (List.nth p 0).elt with
+  | Field id -> let ast_typ, op, str = cmp_path_lhs c p in
+    let uid = (gensym "load") in
+    ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
+  | Call (id, lst) -> failwith "unimplemented"
+  | _ -> failwith "invalid type for 0th element"
+
 
 
 
@@ -428,55 +432,46 @@ and print_string_of_elt elt =
     print_string s
 
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
-    match stmt.elt with
-    | Ast.Ret t -> print_endline ("");
-                   begin match t with
-                   | Some exp -> 
-                          begin match rt with
-                          | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
-                                      begin match op with
-                                      | Id i ->
-                                             (* let nc = add_local c (no_loc i)
-                                              * (i,r) in*)
-                                              c, str >@ [T(Ll.Ret(ty, Some op))]
-                                      | _ ->  c, str >@ [T(Ll.Ret(ty, Some op))]
-                                      end
-                          | None -> failwith "non-void return type for void function"
-                          end
-                   | None -> begin match rt with
-                             | Some _ -> failwith "void return type for non-void function"
-                             | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
-                             end
-                   end
-    
-    | Ast.Assn (p,e) -> print_endline "";
-                        failwith "Assn"
+  match stmt.elt with
+  | Ast.Ret t -> print_endline ("");
+    begin match t with
+      | Some exp -> 
+        begin match rt with
+          | Some r -> let (ty,op,str) = (cmp_exp c r exp) in
+            begin match op with
+              | Id i ->
+                (* let nc = add_local c (no_loc i)
+                 * (i,r) in*)
+                c, str >@  [T(Ll.Ret (ty, Some op))]
+              | _ ->  c, str >@ [T(Ll.Ret(ty, Some op))]
+            end
+          | None -> failwith "non-void return type for void function"
+        end
+      | None -> begin match rt with
+          | Some _ -> failwith "void return type for non-void function"
+          | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
+        end
+    end
 
-    | Ast.Decl d -> print_endline "";
-                    let dec = d.elt in
-                    let lu = (List.mem_assoc dec.id.elt c.local) in
-                    begin match lu with
-                    | false -> begin match rt with
-                               | Some r -> let (ty, op, str) = (cmp_exp c r dec.init) in
-                                           begin match op with
-                                           | Id i -> let nc = add_local c (dec.id) (dec.id.elt, r) in
-                                                     let nc2 = add_local nc (no_loc i) (i, r) in
-                                                     let uid = gensym "alloca" in
-                                                     nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
-                                                     [I(dec.id.elt,(Ll.Alloca ty))]>@ 
-                                                     [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
-                                           | _ ->    let nc = add_local c (dec.id) (dec.id.elt, r) in
-                                                     let uid = gensym "alloca" in
-                                                     nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
-                                                     [I(dec.id.elt,(Ll.Alloca ty))]>@ 
-                                                     [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
-                                           end
-                                           
-                               | None -> failwith "cannot init variable of type void" 
-                               end
-                    | _ -> failwith "Variable exists in local context"
-                    end
-                     
+  | Ast.Assn (p,e) -> print_endline "";
+    failwith "Assn"
+
+  | Ast.Decl d -> print_endline "";
+    let dec = d.elt in
+    let lu = (List.mem_assoc dec.id.elt c.local) in
+    begin match lu with
+      | false -> let (ty, op, str) = (cmp_exp c dec.ty dec.init) in
+        begin match op with
+          | Id i -> let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
+            (*let nc2 = add_local nc (no_loc i) (i, r) in*)
+            nc,  [I(dec.id.elt,(Ll.Alloca ty))]>@ [I(gensym "store",(Store (ty, op,(Id dec.id.elt))))] 
+          | _ ->    let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
+            nc, [I(dec.id.elt,(Ll.Alloca ty))]>@[I(gensym "store",(Store (ty, op, (Id dec.id.elt))))] 
+        end
+      | _ -> failwith "Variable exists in local context"
+    end
+  | _ -> failwith "unimplemented"
+
 
                
     
