@@ -368,25 +368,24 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    the desired translation type.                                              *)
 
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  begin match p with
-    | {elt = (Field f); loc = _}::rest -> let id = f.elt in
-      let lu = (List.mem_assoc id c.local) in
+  begin match (List.nth p 0).elt with
+    | Field id ->
+      let lu = (List.mem_assoc id.elt c.local) in
+      print_endline (string_of_bool(lu));
       begin match lu with
-        | false ->  let gu = (List.mem_assoc id c.global) in
+        | false ->  let gu = (List.mem_assoc id.elt c.global) in
           begin match gu with
-            | false -> print_endline f.elt; failwith "Variable not declared"
-            | true -> let (uid, ty, llty)  = (lookup_global id c) in
+            | false -> failwith "Variable not declared"
+            | true -> let (uid, ty, llty)  = (lookup_global id.elt c) in
               begin match ty.elt with
                 | TBool | TInt -> (ty, (Ll.Gid uid), [])
                 | _ -> let myuid = (gensym "Bitcast") in
                   (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
               end
           end
-
-        | true ->  let (uid, ty)  = (lookup_local id c) in
+        | true ->  let (uid, ty)  = (lookup_local id.elt c) in
           (ty, Ll.Id uid, [])
       end
-
     | _ -> failwith "Index not implemented"
   end
 
@@ -415,7 +414,9 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
    and the load from the resulting pointer.                                  *)
 and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   match (List.nth p 0).elt with
-  | Field id -> let ast_typ, op, str = cmp_path_lhs c p in
+  | Field id ->
+    print_endline id.elt;
+    let ast_typ, op, str = cmp_path_lhs c p in
     let uid = (gensym "load") in
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
   | Call (id, lst) -> 
@@ -493,6 +494,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                           c,(whileloop c rt o1 b1 s1) 
 
   | Ast.Assn (p,e) ->
+    print_endline "Assn";
     let (t1, o1, s1) = (cmp_path_lhs c p) in
     let (t2, o2, s2) = (cmp_exp c t1 e) in
     
@@ -613,23 +615,41 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   let arg_typs = List.map arg_typ args in
   let func_fty = (arg_typs, rettyp) in
   let func_param = List.map arg_id args in
-  
-  let new_ctxt, strm = cmp_block c rtyp body in
-  (* List.iter (print_string_of_elt) strm; *)
-  let func_cfg, func_llglobals = build_cfg strm in
-  let beginning_block, other_blocks = func_cfg in
-  
-  let block_insns = beginning_block.insns in
-  
+
   let alloca_args  (x: typ * id) =
     begin match x with
       | (x, y) ->
         let uid = gensym "alloca" in
         (uid, (Alloca (cmp_typ x)))::(gensym "alloca", (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
     end
-   in
+  in
 
-   let new_block = {insns=((List.flatten (List.map alloca_args args)) @ block_insns); terminator=beginning_block.terminator} in
+  let args_elt =  (List.map alloca_args args) in
+  
+  let uid_lst (i: int) (x: (string * Ll.insn) list) =
+    begin match (List.nth x 0) with
+      | (uid, y) ->
+        begin match (List.nth args i) with
+          | (typ, id) -> (id, uid, typ) 
+        end   
+    end in
+  
+  let update_ctxt (c: ctxt) (x: Ast.id * string * Ast.typ) =
+    begin match x with 
+      | (id, str, typ) -> add_local c id (str, typ)
+    end
+  in
+
+  let nc = List.fold_left update_ctxt c (List.mapi uid_lst args_elt) in
+
+  let new_ctxt, strm = cmp_block nc rtyp body in
+  (* List.iter (print_string_of_elt) strm; *)
+  let func_cfg, func_llglobals = build_cfg strm in
+  let beginning_block, other_blocks = func_cfg in
+  
+  let block_insns = beginning_block.insns in
+  
+   let new_block = {insns = ((List.flatten args_elt) @ block_insns); terminator=beginning_block.terminator} in
    let new_cfg = (new_block, other_blocks) in
    ((name.elt, {fty=func_fty; param=func_param; cfg=new_cfg}), func_llglobals)
                 
