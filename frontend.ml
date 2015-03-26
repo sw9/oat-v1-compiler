@@ -360,10 +360,26 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    must Bitcast the more specific type (found in the globals context) to
    the desired translation type.                                              *)
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-    begin match (List.nth p 0).elt with
-    | Field f -> let id = f.elt in
-                 let (uid, ty)  = (lookup_local id c) in
-                 (ty, Ll.Id uid, [])
+    begin match p with
+    | {elt = (Field f); loc = _}::rest -> let id = f.elt in
+                                          let lu = (List.mem_assoc id c.local) in
+                                          begin match lu with
+                                          | false ->  let gu = (List.mem_assoc id c.global) in
+                                                      begin match gu with
+                                                      | false -> failwith "Variable not declared"
+                                                      | true -> let (uid, ty, llty)  = (lookup_global id c) in
+                                                                begin match ty.elt with
+                                                                | TBool | TInt -> (ty, (Ll.Gid uid), [])
+                                                                | _ -> let myuid = (gensym "Bitcast") in
+                                                                (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
+                                                                end
+                                                                                        
+                                                      end
+
+                                          | true ->  let (uid, ty)  = (lookup_local id c) in
+                                                     (ty, Ll.Id uid, [])
+                                          end
+
     | _ -> failwith "Index and Call not implemented"
     end
 
@@ -446,7 +462,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                                            | Id i -> let nc = add_local c (dec.id) (dec.id.elt, r) in
                                                      let nc2 = add_local nc (no_loc i) (i, r) in
                                                      let uid = gensym "alloca" in
-                                                     nc2, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
+                                                     nc, [I(uid,(Ll.Alloca ty))]>@ [I(gensym "alloca",(Store (ty, op,(Id uid))))]>@
                                                      [I(dec.id.elt,(Ll.Alloca ty))]>@ 
                                                      [I(gensym "alloca",(Store (ty, Id uid,(Id dec.id.elt))))]
                                            | _ ->    let nc = add_local c (dec.id) (dec.id.elt, r) in
@@ -524,7 +540,7 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   let func_param = List.map arg_id args in
   
   let new_ctxt, strm = cmp_block c rtyp body in
-  List.iter (print_string_of_elt) strm;
+  (* List.iter (print_string_of_elt) strm; *)
   let func_cfg, func_llglobals = build_cfg strm in
   let beginning_block, other_blocks = func_cfg in
   
