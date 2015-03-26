@@ -254,7 +254,15 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       | Ast.TRef r -> (cmp_typ t), Ll.Null, []
       | _ -> failwith "exp does not have the correct source type"
       end
-    | _ -> failwith "not implemented"
+    
+    | Ast.CStr str -> let ident = (gensym "str") in
+    (Ll.Ptr(str_arr_typ str)), (Ll.Gid ident), [G(ident, (str_arr_typ str, Ll.GString str))]
+                
+
+
+    | _ -> failwith "not implemented lel"
+
+
   end
 
 
@@ -269,8 +277,7 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 
    - a NewArray expression must allocate the storage space for the 
      array (see the oat_alloc_array_dynamic) function, and generate
-     iterator code for the array initializer
-
+     iterator code for the array inistr_arr_typ str
    - see the description of path expressions below                            *)
 
 let cmp_binop bop ty op1 op2 :  insn =
@@ -463,7 +470,7 @@ let rec cmp_decls c rt d ans: ctxt*stream =
    - If the statement is a Return statement, it's form must match the
      rt argument.
 
-   - If the statement is an SCall, it must be to a path identifying a 
+   - IfLthe statement is an SCall, it must be to a path identifying a 
      void function.  Note that this implies that the path has only one
      accessor.                                                                *)
 
@@ -540,13 +547,29 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     let lu = (List.mem_assoc dec.id.elt c.local) in
     begin match lu with
       | false -> let (ty, op, str) = (cmp_exp c dec.ty dec.init) in
+      let nc0 = begin match dec.ty.elt with
+                | Ast.TRef r -> begin match r.elt with
+                                | Ast.RString -> begin match dec.init.elt with
+                                                 | Ast.Const co ->begin match co.elt with
+                                                 |Ast.CStr str -> print_endline "HERHEHE";
+                                                                         (add_global c dec.id ((dec.id.elt), dec.ty, (str_arr_typ str)))
+                                                                 | _ -> c
+                                                 end
+                                                 | _  -> c
+                                end
+
+                                | _ -> c
+                                end
+                | _ -> c
+                end in
+
         begin match op with
-          | Id i -> let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
-            (*let nc2 = add_local nc (no_loc i) (i, r) in*)
+          | Id i -> let nc = add_local nc0 (dec.id) (dec.id.elt, dec.ty) in
             nc,  str>@[I(dec.id.elt,(Ll.Alloca ty))]>@ [I(gensym "store",(Store (ty, op,(Id dec.id.elt))))] 
           | _ ->    let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
             nc, str>@[I(dec.id.elt,(Ll.Alloca ty))]>@[I(gensym "store",(Store (ty, op, (Id dec.id.elt))))] 
         end
+
       | _ -> failwith "Variable exists in local context"
     end
   | _ -> failwith "unimplemented"
