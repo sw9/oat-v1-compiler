@@ -447,6 +447,12 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   | _ -> failwith "invalid type for 0th element"
 
 
+let rec cmp_decls c rt d ans: ctxt*stream = 
+    begin match d with
+    | [] -> c, ans
+    | d::rest -> let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl d)) in
+              (cmp_decls c1 rt rest (ans >@ s))
+    end
 
 
 (* compile a statement ------------------------------------------------------ *)
@@ -493,6 +499,35 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
   | Ast.While (e, b1) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
                           c,(whileloop c rt o1 b1 s1) 
 
+
+  | Ast.For (d,e,s,b) -> let (c0,codes) = (cmp_decls c rt d []) in
+                         let (t,o,exp) = begin match e with
+                         | None -> (cmp_const (Ast.no_loc (Ast.CBool true)) (Ast.no_loc (Ast.TBool)))
+                         | Some ex -> (cmp_exp c0 (Ast.no_loc Ast.TBool) ex)
+                         end in
+                         let (c1, stcode) = begin match s with
+                         | None -> c0,[]
+                         | Some st -> (cmp_stmt c0 rt st)
+                         end in
+                         
+
+                          let _,e_b1 = cmp_block c1 rt b in
+                          let if_label = (gensym "if") in
+                          let cond_label = (gensym "cond") in
+                          let merge_label = (gensym "merge") in
+                          
+                          
+                          c1, codes >@
+                          [T (Br (cond_label))] >@
+                          [L cond_label]  >@ exp >@
+                          [T (Cbr (o, if_label, merge_label))] >@
+                          [L if_label] >@ e_b1 >@ stcode >@[T (Br cond_label)]>@ 
+                          [L merge_label]
+
+
+                            
+              
+
   | Ast.Assn (p,e) ->
     print_endline "Assn";
     let (t1, o1, s1) = (cmp_path_lhs c p) in
@@ -517,7 +552,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
   | _ -> failwith "unimplemented"
 
 
-               
+
     
 and ifloop c rt exp b1 b2 : stream =
     let _,e_b1 = cmp_block c rt b1 in
