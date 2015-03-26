@@ -365,6 +365,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    has static length '0' as the type.  To reconcile these differences, you
    must Bitcast the more specific type (found in the globals context) to
    the desired translation type.                                              *)
+
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   begin match p with
     | {elt = (Field f); loc = _}::rest -> let id = f.elt in
@@ -460,20 +461,17 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
           | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
         end
     end
-
-  | Ast.Assn (p,e) -> let (t1, o1, s1) = (cmp_path_exp c p) in
-                      begin match rt with
-                      | Some r -> let (t2, o2, s2) = (cmp_exp c r e) in
-                                    c,  s1>@s2>@[I(gensym "Assn",(Store (t2, o2, o1)))] 
-
-                      | None -> failwith "variable set to void function output"
-                      end
-  
   | Ast.If (e, b1, b2) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
                           c, s1 >@ (condition c rt o1 b1 b2)
 
 
                       
+
+  | Ast.Assn (p,e) ->
+    let (t1, o1, s1) = (cmp_path_lhs c p) in
+    let (t2, o2, s2) = (cmp_exp c t1 e) in
+    
+    c, s1>@s2>@[I(gensym "Assn", (Store (t2, o2, o1)))]
 
   | Ast.Decl d -> print_endline "";
     let dec = d.elt in
