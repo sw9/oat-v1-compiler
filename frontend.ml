@@ -486,9 +486,12 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
         end
     end
   | Ast.If (e, b1, b2) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
-                          c, s1 >@ (condition c rt o1 b1 b2)
+                          c, s1 >@ (ifloop c rt o1 b1 b2)
 
 
+  | Ast.While (e, b1) -> (* let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
+                          c, s1 >@ (whileloop c rt o1 b1) *) failwith
+                          "unimplemented"
                       
 
   | Ast.Assn (p,e) ->
@@ -516,7 +519,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
 
                
     
-and condition c rt exp b1 b2 : stream =
+and ifloop c rt exp b1 b2 : stream =
     let _,e_b1 = cmp_block c rt b1 in
     if List.length b2 <> 0 then begin
     let _,e_b2 = cmp_block c rt b2 in
@@ -541,6 +544,13 @@ and condition c rt exp b1 b2 : stream =
     [L merge_label]
     end
 
+and whileloop c rt exp b1 : stream =
+  let _,e_b1 = cmp_block c rt b1 in
+  let if_label = (gensym "if") in
+  let merge_label = (gensym "merge") in
+  [T (Cbr (exp, if_label, merge_label))] >@
+  [L if_label] >@ e_b1 >@ [T (Br if_label)]>@
+  [L merge_label]
 
 
 
