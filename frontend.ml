@@ -299,6 +299,14 @@ let ty_of_bop bop : ty =
     | Ast.Eq _ | Ast.Neq _ | Ast.Lt _ | Ast.Lte _ | Ast.Gt _ | Ast.Gte _ |
     Ast.And _ | Ast.Or _ -> (cmp_typ (Ast.no_loc Ast.TBool))
 
+
+let astty_of_bop bop =
+    match bop with
+    | Ast.Add _  | Ast.Mul _ | Ast.Sub _ | Ast.Shl _ | Ast.Shr _ | Ast.Sar _
+    | Ast.IAnd _ | Ast.IOr _ 
+    | Ast.Eq _ | Ast.Neq _ | Ast.Lt _ | Ast.Lte _ | Ast.Gt _ | Ast.Gte _  ->  (Ast.no_loc Ast.TInt)
+    | Ast.And _ | Ast.Or _ -> (Ast.no_loc Ast.TBool)
+
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
   begin match exp.elt with
     | Ast.Const c -> (cmp_const c t)
@@ -315,12 +323,12 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
          | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
 
     | Ast.Bop (bop,e1,e2) -> 
-      let (ans_ty1, op1, code1) = (cmp_exp c t e1) in
-      let (ans_ty2, op2, code2) = (cmp_exp c t e2) in
+      let (ans_ty1, op1, code1) = (cmp_exp c (astty_of_bop bop) e1) in
+      let (ans_ty2, op2, code2) = (cmp_exp c (astty_of_bop bop) e2) in
       let ans_id = (gensym "bop") in 
       let my_ty = (ty_of_bop bop) in
-      if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
-      else 
+      (* if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
+      else *)
         ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                                                             (cmp_binop bop my_ty op1 op2)))
     | _ -> failwith "unimplemented"
@@ -472,12 +480,18 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
           | None -> let t = Ll.Ret(Ll.Void, None) in c, [T t]
         end
     end
+  | Ast.If (e, b1, b2) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
+                          c, s1 >@ (condition c rt o1 b1 b2)
+
+
+                      
 
   | Ast.Assn (p,e) ->
     let (t1, o1, s1) = (cmp_path_lhs c p) in
     let (t2, o2, s2) = (cmp_exp c t1 e) in
     
     c, s1>@s2>@[I(gensym "Assn", (Store (t2, o2, o1)))]
+
   | Ast.Decl d -> print_endline "";
     let dec = d.elt in
     let lu = (List.mem_assoc dec.id.elt c.local) in
@@ -497,6 +511,30 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
 
                
     
+and condition c rt exp b1 b2 : stream =
+    let _,e_b1 = cmp_block c rt b1 in
+    if List.length b2 <> 0 then begin
+    let _,e_b2 = cmp_block c rt b2 in
+    let if_label = (gensym "if") in
+    let else_label = (gensym "else") in
+    let merge_label = (gensym "merge") in
+
+    [T (Cbr (exp, if_label, else_label))] >@
+    [L if_label] >@ e_b1 >@ [T (Br merge_label)] >@ 
+    [L else_label] >@ e_b2 >@ 
+    [L merge_label]
+
+    end
+
+    else begin
+
+    let if_label = (gensym "if") in
+    let merge_label = (gensym "merge") in
+
+    [T (Cbr (exp, if_label, merge_label))] >@
+    [L if_label] >@ e_b1 >@ [T (Br merge_label)]>@ 
+    [L merge_label]
+    end
 
 
 
@@ -640,8 +678,8 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
         | CNull -> (typ, GNull, [(gid, (typ, GNull))])
         | CBool b -> 
           begin match b with
-            | true -> (typ, (GInt 0L), [(gid, (typ, GInt 0L))])
-            | false -> (typ, GInt 1L, [(gid, (typ, GInt 1L))])
+            | true -> (typ, (GInt 1L), [(gid, (typ, GInt 1L))])
+            | false -> (typ, GInt 0L, [(gid, (typ, GInt 0L))])
           end
         | CInt i -> (typ, GInt i, [(gid, (typ, GInt i))])
         | CStr s -> let gid2 = gensym "constant" in
