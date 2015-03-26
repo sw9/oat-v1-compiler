@@ -374,7 +374,7 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
       begin match lu with
         | false ->  let gu = (List.mem_assoc id c.global) in
           begin match gu with
-            | false ->       print_endline f.elt; failwith "Variable not declared"
+            | false -> print_endline f.elt; failwith "Variable not declared"
             | true -> let (uid, ty, llty)  = (lookup_global id c) in
               begin match ty.elt with
                 | TBool | TInt -> (ty, (Ll.Gid uid), [])
