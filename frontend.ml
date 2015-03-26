@@ -358,28 +358,28 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    must Bitcast the more specific type (found in the globals context) to
    the desired translation type.                                              *)
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-    begin match p with
+  begin match p with
     | {elt = (Field f); loc = _}::rest -> let id = f.elt in
-                                          let lu = (List.mem_assoc id c.local) in
-                                          begin match lu with
-                                          | false ->  let gu = (List.mem_assoc id c.global) in
-                                                      begin match gu with
-                                                      | false -> failwith "Variable not declared"
-                                                      | true -> let (uid, ty, llty)  = (lookup_global id c) in
-                                                                begin match ty.elt with
-                                                                | TBool | TInt -> (ty, (Ll.Gid uid), [])
-                                                                | _ -> let myuid = (gensym "Bitcast") in
-                                                                (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
-                                                                end
-                                                                                        
-                                                      end
+      let lu = (List.mem_assoc id c.local) in
+      begin match lu with
+        | false ->  let gu = (List.mem_assoc id c.global) in
+          begin match gu with
+            | false -> failwith "Variable not declared"
+            | true -> let (uid, ty, llty)  = (lookup_global id c) in
+              begin match ty.elt with
+                | TBool | TInt -> (ty, (Ll.Gid uid), [])
+                | _ -> let myuid = (gensym "Bitcast") in
+                  (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
+              end
 
-                                          | true ->  let (uid, ty)  = (lookup_local id c) in
-                                                     (ty, Ll.Id uid, [])
-                                          end
+          end
+
+        | true ->  let (uid, ty)  = (lookup_local id c) in
+          (ty, Ll.Id uid, [])
+      end
 
     | _ -> failwith "Index and Call not implemented"
-    end
+  end
 
 
 
@@ -464,9 +464,9 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
         begin match op with
           | Id i -> let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
             (*let nc2 = add_local nc (no_loc i) (i, r) in*)
-            nc,  [I(dec.id.elt,(Ll.Alloca ty))]>@ [I(gensym "store",(Store (ty, op,(Id dec.id.elt))))] 
+            nc,  str>@[I(dec.id.elt,(Ll.Alloca ty))]>@ [I(gensym "store",(Store (ty, op,(Id dec.id.elt))))] 
           | _ ->    let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
-            nc, [I(dec.id.elt,(Ll.Alloca ty))]>@[I(gensym "store",(Store (ty, op, (Id dec.id.elt))))] 
+            nc, str>@[I(dec.id.elt,(Ll.Alloca ty))]>@[I(gensym "store",(Store (ty, op, (Id dec.id.elt))))] 
         end
       | _ -> failwith "Variable exists in local context"
     end
