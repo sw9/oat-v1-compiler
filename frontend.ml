@@ -189,8 +189,8 @@ let gep_array_len = [
 
 let ty_of_unop (uop:Ast.unop) : ty =
     match uop with
-    | Ast.Neg _ | Ast.Bitnot _ -> (cmp_typ (Ast.no_loc Ast.TInt))
-    | Ast.Lognot _ -> (cmp_typ (Ast.no_loc Ast.TBool))
+    | Ast.Neg | Ast.Bitnot -> (cmp_typ (Ast.no_loc Ast.TInt))
+    | Ast.Lognot -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 (* Generate a call to the runtime.c function oat_alloc_array.  t is
    the src type size is an i64 operand, the number of elements in the
@@ -239,22 +239,23 @@ let oat_alloc_array_static (t:Ast.typ) (n:int) : operand * stream=
 
 *)
 let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
-    begin match cn.elt with
+  begin match cn.elt with
     | Ast.CInt i -> 
-            if t.elt <> Ast.TInt then failwith "exp does not have
+      if t.elt <> Ast.TInt then failwith "exp does not have
             the correct source type"
-            else (cmp_typ t), (Ll.Const i), []
+      else (cmp_typ t), (Ll.Const i), []
     | Ast.CBool b ->
-            if t.elt <> Ast.TBool then failwith "exp does not have
+      if t.elt <> Ast.TBool then failwith "exp does not have
             the correct source type"
-            else (cmp_typ t), (i1_op_of_bool b), []
+      else (cmp_typ t), (i1_op_of_bool b), []
 
     | Ast.CNull ->
-            match t.elt with
-            | Ast.TRef r -> (cmp_typ t), Ll.Null, []
-            | _ -> failwith "exp does not have the correct
-            source type"
-    end
+      begin match t.elt with
+      | Ast.TRef r -> (cmp_typ t), Ll.Null, []
+      | _ -> failwith "exp does not have the correct source type"
+      end
+    | _ -> failwith "not implemented"
+  end
 
 
 
@@ -274,38 +275,38 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 
 let cmp_binop bop ty op1 op2 :  insn =
     begin match bop with
-      | Ast.Add _  -> Ll.Binop (Add, ty, op1, op2)
-      | Ast.Mul _ -> Ll.Binop (Mul, ty, op1, op2)
-      | Ast.Sub _ -> Ll.Binop (Sub, ty, op1, op2)
-      | Ast.And _   -> Ll.Binop (And, ty, op1, op2)
-      | Ast.IAnd _  -> Ll.Binop (And, ty, op1, op2) 
-      | Ast.IOr _   -> Ll.Binop(Or, ty, op1, op2)
-      | Ast.Or _    -> Ll.Binop(Or, ty, op1, op2)
-      | Ast.Shl _   -> Ll.Binop(Shl, ty, op1, op2)
-      | Ast.Shr _   -> Ll.Binop(Lshr, ty, op1, op2)
-      | Ast.Sar _   -> Ll.Binop(Ashr, ty, op1, op2)
-      | Ast.Eq  _  -> Ll.Icmp(Eq, ty, op1, op2)
-      | Ast.Neq _  -> Ll.Icmp(Ne, ty, op1, op2)
-      | Ast.Lt  _  -> Ll.Icmp(Slt, ty, op1, op2)
-      | Ast.Lte _  -> Ll.Icmp(Sle, ty, op1, op2)
-      | Ast.Gt  _  -> Ll.Icmp(Sgt, ty, op1, op2)
-      | Ast.Gte _  -> Ll.Icmp(Sge, ty, op1, op2)
+      | Ast.Add -> Ll.Binop (Add, ty, op1, op2)
+      | Ast.Mul -> Ll.Binop (Mul, ty, op1, op2)
+      | Ast.Sub -> Ll.Binop (Sub, ty, op1, op2)
+      | Ast.And -> Ll.Binop (And, ty, op1, op2)
+      | Ast.IAnd -> Ll.Binop (And, ty, op1, op2) 
+      | Ast.IOr -> Ll.Binop(Or, ty, op1, op2)
+      | Ast.Or -> Ll.Binop(Or, ty, op1, op2)
+      | Ast.Shl -> Ll.Binop(Shl, ty, op1, op2)
+      | Ast.Shr -> Ll.Binop(Lshr, ty, op1, op2)
+      | Ast.Sar -> Ll.Binop(Ashr, ty, op1, op2)
+      | Ast.Eq  -> Ll.Icmp(Eq, ty, op1, op2)
+      | Ast.Neq -> Ll.Icmp(Ne, ty, op1, op2)
+      | Ast.Lt  -> Ll.Icmp(Slt, ty, op1, op2)
+      | Ast.Lte -> Ll.Icmp(Sle, ty, op1, op2)
+      | Ast.Gt  -> Ll.Icmp(Sgt, ty, op1, op2)
+      | Ast.Gte -> Ll.Icmp(Sge, ty, op1, op2)
      end
 
 let ty_of_bop bop : ty =
     match bop with
-    | Ast.Add _  | Ast.Mul _ | Ast.Sub _ | Ast.Shl _ | Ast.Shr _ | Ast.Sar _
-    | Ast.IAnd _ | Ast.IOr _ -> (cmp_typ (Ast.no_loc Ast.TInt))
-    | Ast.Eq _ | Ast.Neq _ | Ast.Lt _ | Ast.Lte _ | Ast.Gt _ | Ast.Gte _ |
-    Ast.And _ | Ast.Or _ -> (cmp_typ (Ast.no_loc Ast.TBool))
+    | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
+    | Ast.IAnd | Ast.IOr -> (cmp_typ (Ast.no_loc Ast.TInt))
+    | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte |
+    Ast.And | Ast.Or -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 
 let astty_of_bop bop =
     match bop with
-    | Ast.Add _  | Ast.Mul _ | Ast.Sub _ | Ast.Shl _ | Ast.Shr _ | Ast.Sar _
-    | Ast.IAnd _ | Ast.IOr _ 
-    | Ast.Eq _ | Ast.Neq _ | Ast.Lt _ | Ast.Lte _ | Ast.Gt _ | Ast.Gte _  ->  (Ast.no_loc Ast.TInt)
-    | Ast.And _ | Ast.Or _ -> (Ast.no_loc Ast.TBool)
+    | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
+    | Ast.IAnd | Ast.IOr 
+    | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte  ->  (Ast.no_loc Ast.TInt)
+    | Ast.And | Ast.Or -> (Ast.no_loc Ast.TBool)
 
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
   begin match exp.elt with
@@ -318,9 +319,9 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       let (ans_ty, op, code) = (cmp_exp c t e) in
       let ans_id = (gensym "unop") in
       ((ans_ty, (Ll.Id ans_id), code >::I (ans_id, match uop with
-         | Ast.Neg _ -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
-         | Ast.Lognot _ -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
-         | Ast.Bitnot  _ -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
+         | Ast.Neg -> Ll.Binop (Sub, ans_ty, i64_op_of_int 0, op)
+         | Ast.Lognot -> Ll.Icmp  (Eq, ans_ty, op, i1_op_of_bool false)
+         | Ast.Bitnot  -> Ll.Binop (Xor, ans_ty, op, i64_op_of_int (-1)))))
 
     | Ast.Bop (bop,e1,e2) -> 
       let (ans_ty1, op1, code1) = (cmp_exp c (astty_of_bop bop) e1) in
@@ -330,7 +331,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       (* if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
       else *)
         ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
-                                                            (cmp_binop bop my_ty op1 op2)))
+                                                            (cmp_binop bop ans_ty1 op1 op2)))
     | _ -> failwith "unimplemented"
   end
 
@@ -373,14 +374,13 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
       begin match lu with
         | false ->  let gu = (List.mem_assoc id c.global) in
           begin match gu with
-            | false -> failwith "Variable not declared"
+            | false ->       print_endline f.elt; failwith "Variable not declared"
             | true -> let (uid, ty, llty)  = (lookup_global id c) in
               begin match ty.elt with
                 | TBool | TInt -> (ty, (Ll.Gid uid), [])
                 | _ -> let myuid = (gensym "Bitcast") in
                   (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
               end
-
           end
 
         | true ->  let (uid, ty)  = (lookup_local id c) in
@@ -419,24 +419,29 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
     let uid = (gensym "load") in
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
   | Call (id, lst) -> 
-    let gid, (atyplst, rtyp) = lookup_function id.elt c in
+
+    let gid, (atyplst, rtyp) = lookup_function id.elt c in    
     let f (i: int)  (x: Ast.exp) =
       let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
       (ty, (op, str)) in
+
     let typ_lst, temp  = List.split(List.mapi f lst) in
     let op_lst, str_lst_lst = List.split temp in
-    let str_lst = List.flatten str_lst_lst in
+    let str_lst = List.flatten (List.rev str_lst_lst) in
     let uid = gensym "call" in
+
     let ll_rtyp =
       match rtyp with
-      | None -> Void
+      | None -> failwith "can't be void"
       | Some r -> cmp_typ r
     in
+
     let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
     let ast_typ =
       match rtyp with
       | None -> failwith "can't have void function"
-      | Some r -> r in
+      | Some r -> r
+    in
     (ast_typ, Id uid, str_lst >@ [call_elt])
   | _ -> failwith "invalid type for 0th element"
 
