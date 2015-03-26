@@ -453,8 +453,15 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
         end
     end
 
-  | Ast.Assn (p,e) -> print_endline "";
-    failwith "Assn"
+  | Ast.Assn (p,e) -> let (t1, o1, s1) = (cmp_path_exp c p) in
+                      begin match rt with
+                      | Some r -> let (t2, o2, s2) = (cmp_exp c r e) in
+                                  begin match o2 with
+                                  | Id i -> c, (s1 >@ s2 >@ [])             
+
+                      | None -> failwith "variable set to void function output"
+                      end
+                      
 
   | Ast.Decl d -> print_endline "";
     let dec = d.elt in
