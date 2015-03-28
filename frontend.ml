@@ -260,17 +260,17 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
   begin match cn.elt with
     | Ast.CInt i -> 
       if t.elt <> Ast.TInt then failwith "exp does not have
-            the correct source type"
+            the correct source type int"
       else (cmp_typ t), (Ll.Const i), []
     | Ast.CBool b ->
       if t.elt <> Ast.TBool then failwith "exp does not have
-            the correct source type"
+            the correct source type bool"
       else (cmp_typ t), (i1_op_of_bool b), []
 
     | Ast.CNull ->
       begin match t.elt with
         | Ast.TRef r -> (cmp_typ t), Ll.Null, []
-        | _ -> failwith "exp does not have the correct source type"
+        | _ -> failwith "exp does not have the correct source type null"
       end
     | Ast.CStr str -> let btcst = (gensym "bitcast") in
       let str_id = gensym "str" in
