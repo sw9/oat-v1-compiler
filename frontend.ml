@@ -504,6 +504,35 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
     end
   in
 
+  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
+    begin match x with
+      | (x, y, z) ->
+        let t =
+          begin match x.elt with
+            | TRef x ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "incorrect type"
+              end
+            | _ -> failwith "incorrect type"
+          end in
+
+        let str = gensym "index" in
+        let ll_ty, ll_op, ll_strm = begin match a.elt with
+          | Index i ->
+            cmp_exp c (no_loc TInt) i
+          | _ -> failwith "not an index"
+        end in
+
+        let myuid = gensym "loader" in
+        let myuid2 = gensym "store" in
+        let myuid3 = gensym  "store" in
+        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
+        (t, str, z @ ll_strm @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
+    end
+  in
+
+
   begin match (List.nth p 0).elt with
     | Field id ->
       let lu = (List.mem_assoc id.elt c.local) in
@@ -538,8 +567,18 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
             let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
             (new_ty, (Id new_str), List.rev new_strm)
       end
-    | Call (id, explist) -> let (t,o,s) = cmp_path_exp c p in
-                            (t,o,s)
+    | Call (id, explist) -> let (t,o,s) = cmp_path_exp c p in (t,o,s)
+                            (*
+                            begin match o with
+                            | Id u ->
+                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, u, []) (List.tl p) in
+                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
+                            | Gid g ->
+                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, g, []) (List.tl p) in
+                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
+                            end 
+                            *)
+                            
   end
 
 (* Checks that p is a valid path expression, meaning that it is either:
@@ -564,7 +603,38 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
    and the load from the resulting pointer.                                  *)
 
 and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  match (List.nth p 0).elt with
+  
+    
+  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
+    begin match x with
+      | (x, y, z) ->
+        let t =
+          begin match x.elt with
+            | TRef x ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "incorrect type"
+              end
+            | _ -> failwith "incorrect type"
+          end in
+
+        let str = gensym "index" in
+        let ll_ty, ll_op, ll_strm = begin match a.elt with
+          | Index i ->
+            cmp_exp c (no_loc TInt) i
+          | _ -> failwith "not an index"
+        end in
+
+        let myuid = gensym "loader" in
+        let myuid2 = gensym "store" in
+        let myuid3 = gensym  "store" in
+        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
+        (t, str, z @ ll_strm @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
+    end
+  in
+
+    
+begin match (List.nth p 0).elt with
   | Field id ->
 
     let ast_typ, op, str = cmp_path_lhs c p in
@@ -572,6 +642,7 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
   | Call (id, lst) -> 
+
 
     let gid, (atyplst, rtyp) = lookup_function id.elt c in    
     let f (i: int)  (x: Ast.exp) =
@@ -581,7 +652,7 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
     let typ_lst, temp  = List.split(List.mapi f lst) in
     let op_lst, strlst_lst = List.split temp in
     let str_lst = List.flatten (List.rev strlst_lst) in
-    let uid = gensym "call" in
+    let uid = gensym "calller" in
 
     let ll_rtyp =
       match rtyp with
@@ -595,8 +666,21 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
       | None -> failwith "can't have void function"
       | Some r -> r
     in
-    (ast_typ, Id uid, str_lst >@ [call_elt])
+    
+    if (List.length p) = 1  then begin 
+        (ast_typ, Id uid, str_lst >@ [call_elt])
+    end
+
+    else 
+        let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (ast_typ, uid, []) (List.tl p) in
+        (new_ty, (Id new_str), str_lst >@ [call_elt] >@ (List.rev new_strm))
+
+
+
+
   | _ -> failwith "invalid type for 0th element"
+
+end
 
 
 
