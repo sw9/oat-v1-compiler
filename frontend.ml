@@ -180,6 +180,7 @@ let gensym : string -> string =
   fun (s:string) -> incr c; Printf.sprintf "_%s%d" s (!c)
 
 let sym = gensym
+let gen_table = ((Hashtbl.create 100000) : ((string,(string*Ast.typ))  Hashtbl.t))
 
 (* Compile Ocaml constants to LL IR constant operands of the right type.      *)
 let i1_op_of_bool b   = Ll.Const (if b then 1L else 0L)
@@ -504,7 +505,18 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
       begin match lu with
         | false ->  let gu = (List.mem_assoc id.elt c.global) in
           begin match gu with
-            | false -> failwith "Variable not declared"
+            | false -> let hu = (Hashtbl.mem gen_table id.elt) in
+                       begin match hu with
+                       | false -> failwith "Variable not declared"
+                       | true -> 
+                            let (uid, ty)  = (Hashtbl.find gen_table id.elt) in
+                              if List.length p == 1 then
+                                (ty, Ll.Id uid, [])
+                              else
+                                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
+                                (new_ty, (Id new_str), List.rev new_strm)
+                       end
+
             | true -> let (uid, ty, llty)  = (lookup_global id.elt c) in
               let myuid = (gensym "Bitcast") in
               let str_begin = [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))] in
@@ -590,7 +602,12 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 let rec cmp_decls c rt d ans: ctxt*stream = 
   begin match d with
     | [] -> c, ans
-    | d::rest -> let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl d)) in
+    | d::rest ->
+        let d_cont = d.elt in
+        let new_id = (gensym d_cont.id.elt) in
+        Hashtbl.add gen_table d_cont.id.elt (new_id,d_cont.ty);
+        let new_d = Ast.no_loc {ty = d_cont.ty; id = Ast.no_loc(new_id); init = d_cont.init } in 
+        let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl new_d)) in
       (cmp_decls c1 rt rest (ans >@ s))
   end
 
@@ -657,7 +674,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     let merge_label = (gensym "merge") in
 
 
-    c, codes >@
+    c1, codes >@
         [T (Br (cond_label))] >@
         [L cond_label]  >@ exp >@
         [T (Cbr (o, if_label, merge_label))] >@
