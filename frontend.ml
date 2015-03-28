@@ -260,17 +260,17 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
   begin match cn.elt with
     | Ast.CInt i -> 
       if t.elt <> Ast.TInt then failwith "exp does not have
-            the correct source type"
+            the correct source type int"
       else (cmp_typ t), (Ll.Const i), []
     | Ast.CBool b ->
       if t.elt <> Ast.TBool then failwith "exp does not have
-            the correct source type"
+            the correct source type bool"
       else (cmp_typ t), (i1_op_of_bool b), []
 
     | Ast.CNull ->
       begin match t.elt with
         | Ast.TRef r -> (cmp_typ t), Ll.Null, []
-        | _ -> failwith "exp does not have the correct source type"
+        | _ -> failwith "exp does not have the correct source type null"
       end
     | Ast.CStr str -> let btcst = (gensym "bitcast") in
       let str_id = gensym "str" in
@@ -437,11 +437,37 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
          else *)
       ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                                                           (cmp_binop bop ans_ty1 op1 op2)))
-    | _ -> failwith "unimplemented"
-      (*Ast.NewArr (typ, e1, id, e2) ->
+    | Ast.NewArr (typ, e1, id, e2) ->
       let (e1_ty, e1_op, e1_code) = (cmp_exp c t e1) in
-      let op, strm = oat_alloc_array_dynamic typ e1_op  in*)
+      let op, strm = oat_alloc_array_dynamic typ e1_op in
+
+      let arr_id = gensym "newarr" in
+      let size = gensym "newarr" in
+      let counter_alloca = (gensym "counter_alloca") in
+      let cond_label = (gensym "cond") in
+      let cond_op = gensym "cond_op" in
+      let cond_op2 = gensym "cond_op2" in
+      let merge_label = (gensym "merge") in
+      let if_label = (gensym "if") in
       
+      let nc = add_local empty_ctxt (id) (counter_alloca, no_loc TInt) in
+      let exp_ty, exp_op, exp_strm = cmp_exp nc typ e2 in
+      let gep_id = gensym "getelementptr" in
+      let add_res = gensym "add" in
+      
+      (cmp_typ @@ ast_array_typ typ, op, e1_code >@  strm >@  [I (arr_id, Gep ((cmp_typ @@ ast_array_typ typ), op, gep_array_len))] >@
+      [I(size, Load(Ptr I64, Id arr_id))] >@
+      [I(counter_alloca, (Ll.Alloca (I64)))] >@
+      [I(gensym "store", Store(I64, i64_op_of_int 0, Id counter_alloca))] >@ [T (Br (cond_label))] >@
+      [L cond_label]  >@
+      [I(cond_op, Load(Ptr I64, Id counter_alloca))] >@
+      [I(cond_op2, Icmp (Slt, I64, Id cond_op, Id size))]  >@
+      [T (Cbr (Id cond_op2, if_label, merge_label))] >@
+      [L if_label] >@
+      exp_strm >@ [I(gep_id, Gep (cmp_typ @@ ast_array_typ typ, op, gep_array_index (Id cond_op)))] >@
+      [I(gensym "store", Store(cmp_typ typ, exp_op, Id counter_alloca))] >@ [I(add_res, Binop(Add, I64, Id cond_op, i64_op_of_int 1))] >@
+                                         [I(gensym "store", Store(I64, Id add_res, Id counter_alloca))]
+                                         >@ [T (Br cond_label)]>@ [L merge_label])
 
   end
 
@@ -954,8 +980,8 @@ and whileloop c rt exp b1 c1: stream =
   let _,e_b1 = cmp_block c rt b1 in
   let if_label = (gensym "if") in
   let cond_label = (gensym "cond") in
-  let merge_label = (gensym "merge") in(*
-  [L cond_label] >@ c1 >@  
+  let merge_label = (gensym "merge") in
+  (* [L cond_label] >@ c1 >@  
   [T (Cbr (exp, if_label, merge_label))] >@
   [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@
   [L merge_label]*)
