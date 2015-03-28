@@ -459,8 +459,9 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
              cmp_exp c (no_loc TInt) i
           | _ -> failwith "not an index"
          end in
-
-        (t, str, z >@ ll_strm  >@  [I(str, Gep (cmp_typ x, Id y, gep_array_index ll_op))])
+        
+        let myuid = gensym "load" in
+        (t, str, z @ ll_strm  @ [I(myuid, (Load (Ptr(cmp_typ x), Id y)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
     end
   in
 
@@ -477,19 +478,15 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
               if List.length p == 1 then               
                 (ty, (Ll.Id myuid), str_begin)
               else
-                let myuid2 = gensym "Load" in
-                let str_begin2 = str_begin >@ [I(myuid2, (Load (Ptr(cmp_typ ty), Id myuid)))] in
-                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid2, str_begin2) (List.tl p) in
-                (new_ty, (Id new_str), new_strm)
+                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid, str_begin) (List.tl p) in
+                (new_ty, (Id new_str), List.rev new_strm)
           end
         | true ->  let (uid, ty)  = (lookup_local id.elt c) in
           if List.length p == 1 then
             (ty, Ll.Id uid, [])
           else
-            let myuid = gensym "Load" in
-            let str_begin = [I(myuid, (Load (Ptr(cmp_typ ty), Id uid)))] in
-            let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid, str_begin) (List.tl p) in
-            (new_ty, (Id new_str), new_strm)
+            let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
+            (new_ty, (Id new_str), List.rev new_strm)
       end
     | _ -> failwith "unimplemented"
   end
