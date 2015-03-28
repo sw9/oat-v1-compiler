@@ -264,40 +264,69 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       (cmp_typ t, (Id btcst), [G(str, (str_arr_typ str, Ll.GString str))] >@
                            [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str, cmp_typ t)))])
     | Ast.CArr consts -> 
+      let a_ty = begin match t.elt with
+        | TRef x  ->
+          begin match x.elt with
+            | RArray t -> t
+            | _ -> failwith "not an array"
+          end
+        | _ -> failwith "not an array"
+      end in
 
-            let my_ty = cmp_typ t in
-            let na = (gensym "arr_op") in
+      let op, strm = oat_alloc_array_static a_ty (List.length consts) in
+      let cmp_consts (c: const) =
+        let ty, op, strm = cmp_const c  a_ty in
+        (ty, (op, strm))
+      in
+      
+      let temp = List.map cmp_consts consts in
+      let ty_lst, temp2 = List.split temp in
+      let op_lst, strm_lst_lst = List.split temp2 in
+      let strm_lst = List.flatten strm_lst_lst in
+      
+      let copy_consts (i: int) (c: const) =
+        
+        let gid = gensym "array" in
+        let gid2 = gensym "array" in
+        
+        [I(gid, Gep (cmp_typ t, op, gep_array_index (i64_op_of_int i)))] @
+        [I(gid2, Store(cmp_typ  a_ty, (List.nth op_lst i), Gid gid))]
+      in
 
+      let cpy_strm_lst_lst = List.mapi copy_consts consts in
+      let cpy_strm_lst =  List.rev (List.flatten cpy_strm_lst_lst ) in
+      (cmp_typ t, op, strm >@ strm_lst >@ cpy_strm_lst)
 
-            
-            let rec find_type first =
-            begin match first.elt with
-            | Ast.CInt i -> Ast.no_loc (Ast.TInt)
-            | Ast.CBool b -> Ast.no_loc (Ast.TBool)
-            | Ast.CNull  -> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
-            | Ast.CStr s-> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
-            | Ast.CArr a-> (find_type (List.nth a 0))
-            end in
+      (*let my_ty = cmp_typ t in
+      let na = (gensym "arr_op") in
+      let codes = [I(na, (Ll.Alloca (cmp_typ t)))] in
 
-            let fir = List.nth consts 0 in
-            let my_typ = find_type fir in
-            
-            let rec init_array c ind cs =
-                begin match c with
-                | [] -> cs
-                | x::y -> let uid = (gensym "elem") in
-                          init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
-                          [   Const (0L);
-                              Const (1L);
-                              Const (Int64.of_int ind)
-                            ])))] >@
-                            [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
-                end in
-            
-            let codes = [I(na, (Ll.Alloca (cmp_typ t)))] in
-            let codes2 = init_array consts 0 codes in
-  
-            (cmp_typ t),(Id na),codes2
+      let rec find_type first =
+        begin match first.elt with
+          | Ast.CInt i -> Ast.no_loc (Ast.TInt)
+          | Ast.CBool b -> Ast.no_loc (Ast.TBool)
+          | Ast.CNull  -> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+          | Ast.CStr s-> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+          | Ast.CArr a-> (find_type (List.nth a 0))
+        end in
+        
+      let my_typ = find_type fir in
+
+      let rec init_array c ind cs =
+        begin match c with
+          | [] -> cs
+          | x::y -> let uid = (gensym "elem") in
+            init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
+                                                      [   Const (0L);
+                                                          Const (1L);
+                                                          Const (Int64.of_int ind)
+                                                      ])))] >@
+            [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
+        end in
+
+      let codes2 = init_array consts 0 codes in
+
+      (cmp_typ t),(Id na),codes2*)
   end
 
 
@@ -411,29 +440,60 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    the desired translation type.                                              *)
 
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
+  
+  let cmp_accessor (x: typ* string * stream)  (a: accessor) =
+    begin match x with
+      | (x, y, z) ->
+        let t =
+          begin match x.elt with
+            | TRef x ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "incorrect type"
+              end
+            | _ -> failwith "incorrect type"
+          end in
+
+        let str = gensym "index" in
+        let ll_ty, ll_op, ll_strm = begin match a.elt with
+          | Index i ->
+             cmp_exp c (no_loc TInt) i
+          | _ -> failwith "not an index"
+         end in
+
+        (t, str, z >@ ll_strm  >@  [I(str, Gep (cmp_typ x, Id y, gep_array_index ll_op))])
+    end
+  in
+
   begin match (List.nth p 0).elt with
     | Field id ->
       let lu = (List.mem_assoc id.elt c.local) in
-      print_endline (string_of_bool(lu));
       begin match lu with
         | false ->  let gu = (List.mem_assoc id.elt c.global) in
           begin match gu with
             | false -> failwith "Variable not declared"
             | true -> let (uid, ty, llty)  = (lookup_global id.elt c) in
-              begin match ty.elt with
-                | TBool | TInt -> (ty, (Ll.Gid uid), [])
-                | _ -> let myuid = (gensym "Bitcast") in
-                  (ty, (Ll.Id myuid), [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))])
-              end
+              let myuid = (gensym "Bitcast") in
+              let str_begin = [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))] in
+              if List.length p == 1 then               
+                (ty, (Ll.Id myuid), str_begin)
+              else
+                let myuid2 = gensym "Load" in
+                let str_begin2 = str_begin >@ [I(myuid2, (Load (Ptr(cmp_typ ty), Id myuid)))] in
+                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid2, str_begin2) (List.tl p) in
+                (new_ty, (Id new_str), new_strm)
           end
         | true ->  let (uid, ty)  = (lookup_local id.elt c) in
-          (ty, Ll.Id uid, [])
+          if List.length p == 1 then
+            (ty, Ll.Id uid, [])
+          else
+            let myuid = gensym "Load" in
+            let str_begin = [I(myuid, (Load (Ptr(cmp_typ ty), Id uid)))] in
+            let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid, str_begin) (List.tl p) in
+            (new_ty, (Id new_str), new_strm)
       end
-    | _ -> failwith "Index not implemented"
+    | _ -> failwith "unimplemented"
   end
-
-
-
 
 (* Checks that p is a valid path expression, meaning that it is either:
     -  just a well-typed call to a non-void function
@@ -460,7 +520,6 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   match (List.nth p 0).elt with
   | Field id ->
 
-    print_endline id.elt;
     let ast_typ, op, str = cmp_path_lhs c p in
     let uid = (gensym "load") in
     
@@ -519,7 +578,7 @@ and print_string_of_elt elt =
 
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
   match stmt.elt with
-  | Ast.Ret t -> print_endline ("");
+  | Ast.Ret t -> 
     begin match t with
       | Some exp -> 
         begin match rt with
@@ -575,7 +634,6 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
 
 
   | Ast.Assn (p,e) ->
-    print_endline "Assn";
     let (t1, o1, s1) = (cmp_path_lhs c p) in
     let (t2, o2, s2) = (cmp_exp c t1 e) in
 
@@ -608,7 +666,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
             end
 
 
-  | Ast.Decl d -> print_endline "";
+  | Ast.Decl d ->
     let dec = d.elt in
     let lu = (List.mem_assoc dec.id.elt c.local) in
     begin match lu with
@@ -857,7 +915,7 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
           let array_gdecls = List.combine array_ll_ty array_ginit in
           let array_globals = (List.flatten temp_2_globals) in
           let gid2 = gensym "array" in
-          let gid3 = gensym "array" in
+          let gid3 = gensym "array"in
           let array_globals_2 = array_globals
                                 @ [(gid, (Struct[I64; Array (List.length a, a_ll_ty)],
                                            GStruct [(I64, GInt (Int64.of_int (List.length a)));
