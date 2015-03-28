@@ -438,7 +438,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                                                           (cmp_binop bop ans_ty1 op1 op2)))
     | Ast.NewArr (typ, e1, id, e2) ->
-      let (e1_ty, e1_op, e1_code) = (cmp_exp c t e1) in
+      let (e1_ty, e1_op, e1_code) = (cmp_exp c (no_loc TInt) e1) in
       let op, strm = oat_alloc_array_dynamic typ e1_op in
 
       let arr_id = gensym "newarr" in
@@ -450,7 +450,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       let merge_label = (gensym "merge") in
       let if_label = (gensym "if") in
       
-      let nc = add_local empty_ctxt (id) (counter_alloca, no_loc TInt) in
+      let nc = add_local c (id) (counter_alloca, no_loc TInt) in
       let exp_ty, exp_op, exp_strm = cmp_exp nc typ e2 in
       let gep_id = gensym "getelementptr" in
       let add_res = gensym "add" in
@@ -465,7 +465,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       [T (Cbr (Id cond_op2, if_label, merge_label))] >@
       [L if_label] >@
       exp_strm >@ [I(gep_id, Gep (cmp_typ @@ ast_array_typ typ, op, gep_array_index (Id cond_op)))] >@
-      [I(gensym "store", Store(cmp_typ typ, exp_op, Id counter_alloca))] >@ [I(add_res, Binop(Add, I64, Id cond_op, i64_op_of_int 1))] >@
+      [I(gensym "store", Store(cmp_typ typ, exp_op, Id gep_id))] >@ [I(add_res, Binop(Add, I64, Id cond_op, i64_op_of_int 1))] >@
                                          [I(gensym "store", Store(I64, Id add_res, Id counter_alloca))]
                                          >@ [T (Br cond_label)]>@ [L merge_label])
 
