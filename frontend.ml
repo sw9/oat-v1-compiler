@@ -262,7 +262,8 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
     (*(cmp_typ (Ast.no_loc (Ast.TRef (Ast.no_loc Ast.RString)))), 
     (Ll.Gid ident), [G(ident, ( (str_arr_typ str), Ll.GString str))]*)
 
-    | _ -> failwith "not implemented lel"
+    | Ast.CArr consts -> let nt = (gensym "arr") in 
+    (Ll.Array((List.length consts), (Ll.Namedt nt))), (Id nt), []
 
 
   end
@@ -527,7 +528,7 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
                           let merge_label = (gensym "merge") in
                           
                           
-                          c1, codes >@
+                          c, codes >@
                           [T (Br (cond_label))] >@
                           [L cond_label]  >@ exp >@
                           [T (Cbr (o, if_label, merge_label))] >@
