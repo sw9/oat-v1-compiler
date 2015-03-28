@@ -238,6 +238,10 @@ let oat_alloc_array_static (t:Ast.typ) (n:int) : operand * stream=
    and then initializes it with the constant values.
 
 *)
+
+
+
+
 let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
   begin match cn.elt with
     | Ast.CInt i -> 
@@ -259,9 +263,43 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       let str_ptr = gensym "str" in
       (cmp_typ t, (Id btcst), [G(str, (str_arr_typ str, Ll.GString str))] >@
                            [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str, cmp_typ t)))])
-    | Ast.CArr consts -> let nt = (gensym "arr") in 
-    (Ll.Array((List.length consts), (Ll.Namedt nt))), (Id nt), []
+    | Ast.CArr consts -> 
+
+            let my_ty = cmp_typ t in
+            let na = (gensym "arr_op") in
+
+
+            
+            let rec find_type first =
+            begin match first.elt with
+            | Ast.CInt i -> Ast.no_loc (Ast.TInt)
+            | Ast.CBool b -> Ast.no_loc (Ast.TBool)
+            | Ast.CNull  -> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+            | Ast.CStr s-> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+            | Ast.CArr a-> (find_type (List.nth a 0))
+            end in
+
+            let fir = List.nth consts 0 in
+            let my_typ = find_type fir in
+            
+            let rec init_array c ind cs =
+                begin match c with
+                | [] -> cs
+                | x::y -> let uid = (gensym "elem") in
+                          init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
+                          [   Const (0L);
+                              Const (1L);
+                              Const (Int64.of_int ind)
+                            ])))] >@
+                            [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
+                end in
+            
+            let codes = [I(na, (Ll.Alloca (cmp_typ t)))] in
+            let codes2 = init_array consts 0 codes in
+  
+            (cmp_typ t),(Id na),codes2
   end
+
 
 
 
