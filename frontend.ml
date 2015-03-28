@@ -82,7 +82,7 @@ let build_cfg (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
                    else failwith @@
                      Printf.sprintf "build_cfg: block labeled %s has\
                                      no terminator" l
-                     
+
                  | Some terminator ->
                    (gs, [], None, (l, {insns; terminator})::blks)
                end
@@ -98,7 +98,7 @@ let build_cfg (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
         ({insns; terminator}, blks), gs
     end
   in
-    blocks_of_stream code 
+  blocks_of_stream code 
 
 
 (* Ast helper functions ----------------------------------------------------- *)
@@ -188,9 +188,9 @@ let gep_array_len = [
 ]
 
 let ty_of_unop (uop:Ast.unop) : ty =
-    match uop with
-    | Ast.Neg | Ast.Bitnot -> (cmp_typ (Ast.no_loc Ast.TInt))
-    | Ast.Lognot -> (cmp_typ (Ast.no_loc Ast.TBool))
+  match uop with
+  | Ast.Neg | Ast.Bitnot -> (cmp_typ (Ast.no_loc Ast.TInt))
+  | Ast.Lognot -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 (* Generate a call to the runtime.c function oat_alloc_array.  t is
    the src type size is an i64 operand, the number of elements in the
@@ -218,7 +218,7 @@ let oat_alloc_array_static (t:Ast.typ) (n:int) : operand * stream=
 
 
 
- 
+
 (* Compile a constant ------------------------------------------------------- *)
 
 (* Invariant: cn is a source constant that should be checked to have
@@ -251,21 +251,16 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 
     | Ast.CNull ->
       begin match t.elt with
-      | Ast.TRef r -> (cmp_typ t), Ll.Null, []
-      | _ -> failwith "exp does not have the correct source type"
+        | Ast.TRef r -> (cmp_typ t), Ll.Null, []
+        | _ -> failwith "exp does not have the correct source type"
       end
-    
-    | Ast.CStr str -> let ident = (gensym "str") in
-    (Ll.Ptr(str_arr_typ str)), (Ll.Gid ident), [G(ident, (str_arr_typ str, Ll.GString str))]
-                
-
-    (*(cmp_typ (Ast.no_loc (Ast.TRef (Ast.no_loc Ast.RString)))), 
-    (Ll.Gid ident), [G(ident, ( (str_arr_typ str), Ll.GString str))]*)
-
+    | Ast.CStr str -> let btcst = (gensym "bitcast") in
+      let str = gensym "str" in
+      let str_ptr = gensym "str" in
+      (cmp_typ t, (Id btcst), [G(str, (str_arr_typ str, Ll.GString str))] >@
+                           [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str, cmp_typ t)))])
     | Ast.CArr consts -> let nt = (gensym "arr") in 
     (Ll.Array((List.length consts), (Ll.Namedt nt))), (Id nt), []
-
-
   end
 
 
@@ -284,39 +279,39 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
    - see the description of path expressions below                            *)
 
 let cmp_binop bop ty op1 op2 :  insn =
-    begin match bop with
-      | Ast.Add -> Ll.Binop (Add, ty, op1, op2)
-      | Ast.Mul -> Ll.Binop (Mul, ty, op1, op2)
-      | Ast.Sub -> Ll.Binop (Sub, ty, op1, op2)
-      | Ast.And -> Ll.Binop (And, ty, op1, op2)
-      | Ast.IAnd -> Ll.Binop (And, ty, op1, op2) 
-      | Ast.IOr -> Ll.Binop(Or, ty, op1, op2)
-      | Ast.Or -> Ll.Binop(Or, ty, op1, op2)
-      | Ast.Shl -> Ll.Binop(Shl, ty, op1, op2)
-      | Ast.Shr -> Ll.Binop(Lshr, ty, op1, op2)
-      | Ast.Sar -> Ll.Binop(Ashr, ty, op1, op2)
-      | Ast.Eq  -> Ll.Icmp(Eq, ty, op1, op2)
-      | Ast.Neq -> Ll.Icmp(Ne, ty, op1, op2)
-      | Ast.Lt  -> Ll.Icmp(Slt, ty, op1, op2)
-      | Ast.Lte -> Ll.Icmp(Sle, ty, op1, op2)
-      | Ast.Gt  -> Ll.Icmp(Sgt, ty, op1, op2)
-      | Ast.Gte -> Ll.Icmp(Sge, ty, op1, op2)
-     end
+  begin match bop with
+    | Ast.Add -> Ll.Binop (Add, ty, op1, op2)
+    | Ast.Mul -> Ll.Binop (Mul, ty, op1, op2)
+    | Ast.Sub -> Ll.Binop (Sub, ty, op1, op2)
+    | Ast.And -> Ll.Binop (And, ty, op1, op2)
+    | Ast.IAnd -> Ll.Binop (And, ty, op1, op2) 
+    | Ast.IOr -> Ll.Binop(Or, ty, op1, op2)
+    | Ast.Or -> Ll.Binop(Or, ty, op1, op2)
+    | Ast.Shl -> Ll.Binop(Shl, ty, op1, op2)
+    | Ast.Shr -> Ll.Binop(Lshr, ty, op1, op2)
+    | Ast.Sar -> Ll.Binop(Ashr, ty, op1, op2)
+    | Ast.Eq  -> Ll.Icmp(Eq, ty, op1, op2)
+    | Ast.Neq -> Ll.Icmp(Ne, ty, op1, op2)
+    | Ast.Lt  -> Ll.Icmp(Slt, ty, op1, op2)
+    | Ast.Lte -> Ll.Icmp(Sle, ty, op1, op2)
+    | Ast.Gt  -> Ll.Icmp(Sgt, ty, op1, op2)
+    | Ast.Gte -> Ll.Icmp(Sge, ty, op1, op2)
+  end
 
 let ty_of_bop bop : ty =
-    match bop with
-    | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
-    | Ast.IAnd | Ast.IOr -> (cmp_typ (Ast.no_loc Ast.TInt))
-    | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte |
+  match bop with
+  | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
+  | Ast.IAnd | Ast.IOr -> (cmp_typ (Ast.no_loc Ast.TInt))
+  | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte |
     Ast.And | Ast.Or -> (cmp_typ (Ast.no_loc Ast.TBool))
 
 
 let astty_of_bop bop =
-    match bop with
-    | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
-    | Ast.IAnd | Ast.IOr 
-    | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte  ->  (Ast.no_loc Ast.TInt)
-    | Ast.And | Ast.Or -> (Ast.no_loc Ast.TBool)
+  match bop with
+  | Ast.Add | Ast.Mul | Ast.Sub | Ast.Shl | Ast.Shr | Ast.Sar
+  | Ast.IAnd | Ast.IOr 
+  | Ast.Eq | Ast.Neq | Ast.Lt | Ast.Lte | Ast.Gt | Ast.Gte  ->  (Ast.no_loc Ast.TInt)
+  | Ast.And | Ast.Or -> (Ast.no_loc Ast.TBool)
 
 let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
   begin match exp.elt with
@@ -339,9 +334,9 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       let ans_id = (gensym "bop") in 
       let my_ty = (ty_of_bop bop) in
       (* if my_ty <> (cmp_typ t) then failwith "Incorrect Type for BOP" 
-      else *)
-        ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
-        (cmp_binop bop ans_ty1 op1 op2)))
+         else *)
+      ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
+                                                          (cmp_binop bop ans_ty1 op1 op2)))
     | _ -> failwith "unimplemented"
   end
 
@@ -365,7 +360,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    Note: To compile paths ending with and index, you can treat the prefix as 
    a path denoting an array _expression_.                                    
 
-   
+
    Note: When compiling a _global_ identifier, it is necessary to introduce 
    a Bitcast operation because a globally-defined array or string constant
    might have a type that is more specific than the translation of its
@@ -390,7 +385,7 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
               begin match ty.elt with
                 | TBool | TInt -> (ty, (Ll.Gid uid), [])
                 | _ -> let myuid = (gensym "Bitcast") in
-                  (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, Ptr(cmp_typ ty))))])
+                  (ty, (Ll.Id myuid), [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))])
               end
           end
         | true ->  let (uid, ty)  = (lookup_local id.elt c) in
@@ -426,9 +421,11 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   match (List.nth p 0).elt with
   | Field id ->
+
     print_endline id.elt;
     let ast_typ, op, str = cmp_path_lhs c p in
     let uid = (gensym "load") in
+    
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
   | Call (id, lst) -> 
 
@@ -438,8 +435,8 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
       (ty, (op, str)) in
 
     let typ_lst, temp  = List.split(List.mapi f lst) in
-    let op_lst, str_lst_lst = List.split temp in
-    let str_lst = List.flatten (List.rev str_lst_lst) in
+    let op_lst, strlst_lst = List.split temp in
+    let str_lst = List.flatten (List.rev strlst_lst) in
     let uid = gensym "call" in
 
     let ll_rtyp =
@@ -459,11 +456,11 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 
 
 let rec cmp_decls c rt d ans: ctxt*stream = 
-    begin match d with
+  begin match d with
     | [] -> c, ans
     | d::rest -> let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl d)) in
-              (cmp_decls c1 rt rest (ans >@ s))
-    end
+      (cmp_decls c1 rt rest (ans >@ s))
+  end
 
 
 (* compile a statement ------------------------------------------------------ *)
@@ -479,8 +476,8 @@ let rec cmp_decls c rt d ans: ctxt*stream =
      accessor.                                                                *)
 
 and print_string_of_elt elt = 
-    let s = string_of_elt elt in
-    print_string s
+  let s = string_of_elt elt in
+  print_string s
 
 and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
   match stmt.elt with
@@ -504,46 +501,46 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
         end
     end
   | Ast.If (e, b1, b2) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
-                          c, s1 >@ (ifloop c rt o1 b1 b2)
+    c, s1 >@ (ifloop c rt o1 b1 b2)
 
 
   | Ast.While (e, b1) -> let (t1, o1, s1) = (cmp_exp c (Ast.no_loc Ast.TBool) e) in
-                          c,(whileloop c rt o1 b1 s1) 
+    c,(whileloop c rt o1 b1 s1) 
 
 
   | Ast.For (d,e,s,b) -> let (c0,codes) = (cmp_decls c rt d []) in
-                         let (t,o,exp) = begin match e with
-                         | None -> (cmp_const (Ast.no_loc (Ast.CBool true)) (Ast.no_loc (Ast.TBool)))
-                         | Some ex -> (cmp_exp c0 (Ast.no_loc Ast.TBool) ex)
-                         end in
-                         let (c1, stcode) = begin match s with
-                         | None -> c0,[]
-                         | Some st -> (cmp_stmt c0 rt st)
-                         end in
-                         
-
-                          let _,e_b1 = cmp_block c1 rt b in
-                          let if_label = (gensym "if") in
-                          let cond_label = (gensym "cond") in
-                          let merge_label = (gensym "merge") in
-                          
-                          
-                          c, codes >@
-                          [T (Br (cond_label))] >@
-                          [L cond_label]  >@ exp >@
-                          [T (Cbr (o, if_label, merge_label))] >@
-                          [L if_label] >@ e_b1 >@ stcode >@[T (Br cond_label)]>@ 
-                          [L merge_label]
+    let (t,o,exp) = begin match e with
+      | None -> (cmp_const (Ast.no_loc (Ast.CBool true)) (Ast.no_loc (Ast.TBool)))
+      | Some ex -> (cmp_exp c0 (Ast.no_loc Ast.TBool) ex)
+    end in
+    let (c1, stcode) = begin match s with
+      | None -> c0,[]
+      | Some st -> (cmp_stmt c0 rt st)
+    end in
 
 
-                            
-              
+    let _,e_b1 = cmp_block c1 rt b in
+    let if_label = (gensym "if") in
+    let cond_label = (gensym "cond") in
+    let merge_label = (gensym "merge") in
+
+
+    c, codes >@
+        [T (Br (cond_label))] >@
+        [L cond_label]  >@ exp >@
+        [T (Cbr (o, if_label, merge_label))] >@
+        [L if_label] >@ e_b1 >@ stcode >@[T (Br cond_label)]>@ 
+        [L merge_label]
+
+
+
+
 
   | Ast.Assn (p,e) ->
     print_endline "Assn";
     let (t1, o1, s1) = (cmp_path_lhs c p) in
     let (t2, o2, s2) = (cmp_exp c t1 e) in
-    
+
     c, s1>@s2>@[I(gensym "Assn", (Store (t2, o2, o1)))]
 
   | Ast.SCall p -> 
@@ -578,27 +575,26 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     let lu = (List.mem_assoc dec.id.elt c.local) in
     begin match lu with
       | false -> let (ty, op, str) = (cmp_exp c dec.ty dec.init) in
-      let nc0 = begin match dec.ty.elt with
-                | Ast.TRef r -> begin match r.elt with
-                                | Ast.RString -> begin match dec.init.elt with
-                                                 | Ast.Const co ->begin match co.elt with
-                                                 |Ast.CStr str -> print_endline "HERHEHE";
-                                                                         (add_global c dec.id ((dec.id.elt), dec.ty, (str_arr_typ str)))
-                                                                 | _ -> c
-                                                 end
-                                                 | _  -> c
-                                end
-
-                                | _ -> c
-                                end
-                | _ -> c
-                end in
+        (*let nc0 = begin match dec.ty.elt with
+          | Ast.TRef r -> begin match r.elt with
+              | Ast.RString -> begin match dec.init.elt with
+                  | Ast.Const co ->begin match co.elt with
+                      |Ast.CStr str -> print_endline "HERHEHE";
+                        (add_global c dec.id ((dec.id.elt), dec.ty, (str_arr_typ str)))
+                      | _ -> c
+                    end
+                  | _  -> c
+                end
+              | _ -> c
+            end
+          | _ -> c
+          end in*)
 
         begin match op with
-          | Id i -> let nc = add_local nc0 (dec.id) (dec.id.elt, dec.ty) in
-            nc,  str>@[I(dec.id.elt,(Ll.Alloca ty))]>@ [I(gensym "store",(Store (ty, op,(Id dec.id.elt))))] 
+          | Id i -> let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
+            nc,  str>@[I(dec.id.elt, (Ll.Alloca (cmp_typ dec.ty)))]>@ [I(gensym "store",(Store ((cmp_typ dec.ty), op,(Id dec.id.elt))))] 
           | _ ->    let nc = add_local c (dec.id) (dec.id.elt, dec.ty) in
-            nc, str>@[I(dec.id.elt,(Ll.Alloca ty))]>@[I(gensym "store",(Store (ty, op, (Id dec.id.elt))))] 
+            nc, str>@[I(dec.id.elt, (Ll.Alloca (cmp_typ dec.ty)))]>@ [I(gensym "store",(Store ((cmp_typ dec.ty), op, (Id dec.id.elt))))] 
         end
 
       | _ -> failwith "Variable exists in local context"
@@ -607,10 +603,10 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
 
 
 
-    
+
 and ifloop c rt exp b1 b2 : stream =
-    let _,e_b1 = cmp_block c rt b1 in
-    if List.length b2 <> 0 then begin
+  let _,e_b1 = cmp_block c rt b1 in
+  if List.length b2 <> 0 then begin
     let _,e_b2 = cmp_block c rt b2 in
     let if_label = (gensym "if") in
     let else_label = (gensym "else") in
@@ -621,9 +617,9 @@ and ifloop c rt exp b1 b2 : stream =
     [L else_label] >@ e_b2 >@ [T (Br merge_label)] >@
     [L merge_label]
 
-    end
+  end
 
-    else begin
+  else begin
 
     let if_label = (gensym "if") in
     let merge_label = (gensym "merge") in
@@ -631,7 +627,7 @@ and ifloop c rt exp b1 b2 : stream =
     [T (Cbr (exp, if_label, merge_label))] >@
     [L if_label] >@ e_b1 >@ [T (Br merge_label)]>@ 
     [L merge_label]
-    end
+  end
 
 and whileloop c rt exp b1 c1: stream =
   let _,e_b1 = cmp_block c rt b1 in
@@ -642,12 +638,12 @@ and whileloop c rt exp b1 c1: stream =
   [T (Cbr (exp, if_label, merge_label))] >@
   [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@
   [L merge_label]*)
-    [] >@
-    [T (Br (cond_label))] >@
-    [L cond_label]  >@ c1 >@
-    [T (Cbr (exp, if_label, merge_label))] >@
-    [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@ 
-    [L merge_label]
+  [] >@
+  [T (Br (cond_label))] >@
+  [L cond_label]  >@ c1 >@
+  [T (Cbr (exp, if_label, merge_label))] >@
+  [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@ 
+  [L merge_label]
 
 
 
@@ -684,18 +680,18 @@ type ll_globals = (Ll.gid * Ll.gdecl) list
 
 let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (Ll.gid * Ll.fdecl) * ll_globals =
-  
+
   let rettyp = begin match rtyp with
     | Some x ->
-       cmp_typ x
+      cmp_typ x
     | None -> Void
   end in
-  
+
   let arg_typ  (x: typ * id) =
     begin match x with
       | (y, _) -> cmp_typ y
     end in
-  
+
   let arg_id  (x: typ * id) =
     begin match x with
       | (_, y) -> y.elt
@@ -714,7 +710,7 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   in
 
   let args_elt =  (List.map alloca_args args) in
-  
+
   let uid_lst (i: int) (x: (string * Ll.insn) list) =
     begin match (List.nth x 0) with
       | (uid, y) ->
@@ -722,7 +718,7 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
           | (typ, id) -> (id, uid, typ) 
         end   
     end in
-  
+
   let update_ctxt (c: ctxt) (x: Ast.id * string * Ast.typ) =
     begin match x with 
       | (id, str, typ) -> add_local c id (str, typ)
@@ -735,13 +731,13 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   (* List.iter (print_string_of_elt) strm; *)
   let func_cfg, func_llglobals = build_cfg strm in
   let beginning_block, other_blocks = func_cfg in
-  
+
   let block_insns = beginning_block.insns in
-  
-   let new_block = {insns = ((List.flatten args_elt) @ block_insns); terminator=beginning_block.terminator} in
-   let new_cfg = (new_block, other_blocks) in
-   ((name.elt, {fty=func_fty; param=func_param; cfg=new_cfg}), func_llglobals)
-                
+
+  let new_block = {insns = ((List.flatten args_elt) @ block_insns); terminator=beginning_block.terminator} in
+  let new_cfg = (new_block, other_blocks) in
+  ((name.elt, {fty=func_fty; param=func_param; cfg=new_cfg}), func_llglobals)
+
 
 (* compile all of the fdecls ------------------------------------------------ *)
 let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
@@ -751,7 +747,7 @@ let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
       | Gfdecl y -> (cmp_fdecl c y) ::[]
     end
   in
-  
+
   let x, y = List.split (List.flatten (List.map f p)) in
   (x, (List.flatten y))
 
@@ -769,7 +765,7 @@ let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
 
    - for Null, Bool, and Int types the result type is simply 
      (cmp_tmp ty)
-   
+
    - for String and Array types the resulting Ll.ty should correspond
      exactly to the ginit value's type, which may be more specific
      than (cmp_typ ty).  (Hint: the clang compiler's type errors
@@ -812,7 +808,7 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
           end
         | CInt i -> (typ, GInt i, [(gid, (typ, GInt i))])
         | CStr s -> let gid2 = gensym "constant" in
-          (Ptr (Array (String.length s + 1, I8)),  GGid gid, [(gid, (Array (String.length s + 1, I8),  GString s)); (gid2, (Ptr (Array (String.length s + 1, I8)),  GGid gid))])
+          Ptr (str_arr_typ s),  GGid gid, [(gid, (str_arr_typ s,  GString s))]
         | CArr a -> failwith "unimplemented"
       end
     | _ -> failwith "non-constant expression"
@@ -845,55 +841,55 @@ let fdecl_typ {elt={rtyp; name; args}} : id * funs_binding =
    Use gvdecl_typ and gfdecl_typ to complete this function.                   *)
 
 let cmp_global_ctxt (p:Ast.prog) (c:ctxt) : ctxt * ll_globals =
-  
+
   let gvll  (x: gdecl) =
     begin match x with
-    | Gvdecl d ->
-      let ret = gvdecl_typ d in
-      begin match ret with
-        | (_, x) -> x
-      end
-    | Gfdecl f  -> []
+      | Gvdecl d ->
+        let ret = gvdecl_typ d in
+        begin match ret with
+          | (_, x) -> x
+        end
+      | Gfdecl f  -> []
     end
   in
 
   let gvctxt  (x: gdecl) =
     begin match x with
-    | Gvdecl d ->
-      let ret = gvdecl_typ  d in
+      | Gvdecl d ->
+        let ret = gvdecl_typ  d in
 
-      begin match ret with
-        | (x, _) -> 
-          let str = begin match x with 
-          | (s, _) -> s.elt
-          end in
+        begin match ret with
+          | (x, _) -> 
+            let str = begin match x with 
+              | (s, _) -> s.elt
+            end in
 
-          let vars = begin match x with 
-            | (_, v) -> v
-          end in
+            let vars = begin match x with 
+              | (_, v) -> v
+            end in
 
-          [(str,vars)]
-      end
-    | Gfdecl f  -> []
+            [(str,vars)]
+        end
+      | Gfdecl f  -> []
     end
   in
 
   let gfctxt  (x: gdecl) =
     begin match x with
-    | Gvdecl d -> []
-    | Gfdecl f  ->
-      let ret = fdecl_typ  f in
-      let str = begin match ret with
-        | (s, _) -> s.elt
-      end in
-      
-      let funs = begin match ret with
-        | (_, y) -> y
-      end in
-      [(str, funs)]
+      | Gvdecl d -> []
+      | Gfdecl f  ->
+        let ret = fdecl_typ  f in
+        let str = begin match ret with
+          | (s, _) -> s.elt
+        end in
+
+        let funs = begin match ret with
+          | (_, y) -> y
+        end in
+        [(str, funs)]
     end
   in
-  
+
   let llglob =  List.flatten (List.map gvll p) in
   let globvar =  List.flatten (List.map gvctxt p) in
   let globfun =  List.flatten (List.map gfctxt p) in
@@ -940,18 +936,18 @@ let oat_ll_prelude =
       rtyp_str fn args_str
   in
   let declares = List.map to_str prelude
-               |> String.concat "\n"
+                 |> String.concat "\n"
   in
   Printf.sprintf 
-  "target datalayout = \"e-m:o-i64:64-f80:128-n8:16:32:64-S128\"\n\n\
-  ; ------------------------------------------------ prelude\n\n\
-  ; internal oat functions (not available in source)\n\
-  declare i64* @oat_malloc(i64)\n\
-  declare {i64, [0 x i64]}* @oat_alloc_array (i64)\n\
-  \n\
-  ; oat 'builtin' functions\n\
-  %s\n\
-  ; --------------------------------------------------------\n\n\
-  " declares
+    "target datalayout = \"e-m:o-i64:64-f80:128-n8:16:32:64-S128\"\n\n\
+     ; ------------------------------------------------ prelude\n\n\
+     ; internal oat functions (not available in source)\n\
+     declare i64* @oat_malloc(i64)\n\
+     declare {i64, [0 x i64]}* @oat_alloc_array (i64)\n\
+     \n\
+     ; oat 'builtin' functions\n\
+     %s\n\
+     ; --------------------------------------------------------\n\n\
+    " declares
 
-    
+
