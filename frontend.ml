@@ -436,7 +436,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
          else *)
       ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                                                           (cmp_binop bop ans_ty1 op1 op2)))
-    | _ -> failwith "unimplemented"
+    | Ast.NewArr (ty,e1,id,e2) -> failwith "unimplemented"
   end
 
 (* Compile a path as a left-hand-side --------------------------------------- *)
