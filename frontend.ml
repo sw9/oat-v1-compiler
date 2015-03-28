@@ -254,7 +254,6 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
         | Ast.TRef r -> (cmp_typ t), Ll.Null, []
         | _ -> failwith "exp does not have the correct source type"
       end
-
     | Ast.CStr str -> let btcst = (gensym "bitcast") in
       let str = gensym "str" in
       let str_ptr = gensym "str" in
@@ -386,7 +385,7 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
               begin match ty.elt with
                 | TBool | TInt -> (ty, (Ll.Gid uid), [])
                 | _ -> let myuid = (gensym "Bitcast") in
-                  (ty, (Ll.Id myuid), [I(myuid,(Bitcast (llty, Ll.Gid uid, (cmp_typ ty))))])
+                  (ty, (Ll.Id myuid), [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))])
               end
           end
         | true ->  let (uid, ty)  = (lookup_local id.elt c) in
@@ -418,6 +417,7 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 
    Note: if path is not just a call, you can compile it as a left-hand-side
    and the load from the resulting pointer.                                  *)
+
 and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
   match (List.nth p 0).elt with
   | Field id ->
@@ -542,6 +542,33 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     let (t2, o2, s2) = (cmp_exp c t1 e) in
 
     c, s1>@s2>@[I(gensym "Assn", (Store (t2, o2, o1)))]
+
+  | Ast.SCall p -> 
+          begin match (List.nth p 0).elt with
+          | Call (id, lst) -> 
+                  let gid, (atyplst, rtyp) = lookup_function id.elt c in    
+                  let f (i: int)  (x: Ast.exp) =
+                      let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
+                      (ty, (op, str)) in
+
+                        let typ_lst, temp  = List.split(List.mapi f lst) in
+                        let op_lst, str_lst_lst = List.split temp in
+                        let str_lst = List.flatten (List.rev str_lst_lst) in
+                        let uid = gensym "scall" in
+
+                  let ll_rtyp =
+                      begin match rtyp with
+                      | None -> Void
+                      | Some r -> cmp_typ r
+                      end
+                      in
+
+                    let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
+                    (c, str_lst >@ [call_elt])
+
+            | _ -> failwith "illegal first element for scall"
+            end
+
 
   | Ast.Decl d -> print_endline "";
     let dec = d.elt in
