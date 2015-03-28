@@ -259,8 +259,9 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       let str_ptr = gensym "str" in
       (cmp_typ t, (Id btcst), [G(str, (str_arr_typ str, Ll.GString str))] >@
                            [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str, cmp_typ t)))])
-    | Ast.CArr consts -> let nt = (gensym "arr") in 
-    (Ll.Array((List.length consts), (Ll.Namedt nt))), (Id nt), []
+    (*| Ast.CArr consts -> let nt = (gensym "arr") in 
+    (Ll.Array((List.length consts), (Ll.Namedt nt))), (Id nt), []*)
+    | _ -> failwith "not implemented"
   end
 
 
@@ -787,29 +788,45 @@ let cmp_fdecls (c:ctxt) (p:Ast.prog) :  ll_funs * ll_globals =
 let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
   let gid = gensym "constant" in
 
-  let typ =
-    begin match init.elt with
-      | Const x ->
-        begin match x.elt with
-          | CArr a -> failwith "unimplemented"
-          | _ -> cmp_typ ty
-        end
-      | _ -> failwith "non-constant expression"
-    end in
-
   begin match init.elt with
     | Const x ->
       begin match x.elt with
-        | CNull -> (typ, GNull, [(gid, (typ, GNull))])
+        | CNull -> (cmp_typ ty, GNull, [(gid, (cmp_typ ty, GNull))])
         | CBool b -> 
           begin match b with
-            | true -> (typ, (GInt 1L), [(gid, (typ, GInt 1L))])
-            | false -> (typ, GInt 0L, [(gid, (typ, GInt 0L))])
+            | true -> (cmp_typ ty, (GInt 1L), [(gid, (cmp_typ ty, GInt 1L))])
+            | false -> (cmp_typ ty, GInt 0L, [(gid, (cmp_typ ty, GInt 0L))])
           end
-        | CInt i -> (typ, GInt i, [(gid, (typ, GInt i))])
+        | CInt i -> (cmp_typ ty, GInt i, [(gid, (cmp_typ ty, GInt i))])
         | CStr s -> let gid2 = gensym "constant" in
-          Ptr (str_arr_typ s),  GGid gid, [(gid, (str_arr_typ s,  GString s))]
-        | CArr a -> failwith "unimplemented"
+          Ptr(str_arr_typ s),  GGid gid, [(gid, (str_arr_typ s,  GString s))]
+        | CArr a ->
+          let a_ty = begin match ty.elt with
+            | TRef x  ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "not an array"
+              end
+            | _ -> failwith "not an array"
+          end in
+          let a_ll_ty, _, _ = cmp_init a_ty (no_loc (Const (List.nth a 0))) in
+          let f (a: const) =
+            let x, y, z = cmp_init a_ty (no_loc (Const a)) in
+            (x, (y, z))
+          in
+          let lst = List.map f a in
+          let array_ll_ty, temp = List.split lst in
+          let array_ginit,temp_2_globals = List.split temp in
+          let array_gdecls = List.combine array_ll_ty array_ginit in
+          let array_globals = (List.flatten temp_2_globals) in
+          let gid2 = gensym "array" in
+          let gid3 = gensym "array" in
+          let array_globals_2 = array_globals
+                                @ [(gid, (Struct[I64; Array (List.length a, a_ll_ty)],
+                                           GStruct [(I64, GInt (Int64.of_int (List.length a)));
+                                                   (Array (List.length a, a_ll_ty), GArray array_gdecls)]))]
+          in
+          (Ptr(Struct [I64; Array (List.length a, a_ll_ty)]), GGid gid, array_globals_2)    
       end
     | _ -> failwith "non-constant expression"
   end
