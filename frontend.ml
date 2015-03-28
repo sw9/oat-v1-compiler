@@ -273,10 +273,9 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
         | _ -> failwith "exp does not have the correct source type"
       end
     | Ast.CStr str -> let btcst = (gensym "bitcast") in
-      let str = gensym "str" in
-      let str_ptr = gensym "str" in
-      (cmp_typ t, (Id btcst), [G(str, (str_arr_typ str, Ll.GString str))] >@
-                           [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str, cmp_typ t)))])
+      let str_id = gensym "str" in
+      (cmp_typ t, (Id btcst), [G(str_id, (str_arr_typ str, Ll.GString str))] >@
+                              [I(btcst, (Bitcast (Ptr (str_arr_typ str), Gid str_id, cmp_typ t)))])
     | Ast.CArr consts -> 
       let a_ty = begin match t.elt with
         | TRef x  ->
@@ -292,12 +291,12 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
         let ty, op, strm = cmp_const c  a_ty in
         (ty, (op, strm))
       in
-      
+
       let temp = List.map cmp_consts consts in
       let ty_lst, temp2 = List.split temp in
       let op_lst, strm_lst_lst = List.split temp2 in
       let strm_lst = List.flatten strm_lst_lst in
-      
+
       let copy_consts (i: int) (c: const) =
         let gid = gensym "array" in
         let gid2 = gensym "array" in
@@ -375,7 +374,8 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
 
    - a NewArray expression must allocate the storage space for the 
      array (see the oat_alloc_array_dynamic) function, and generate
-     iterator code for the array inistr_arr_typ str
+     iterator code for the array and generate
+     iterator code for the array initializer
    - see the description of path expressions below                            *)
 
 let cmp_binop bop ty op1 op2 :  insn =
@@ -437,7 +437,12 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
          else *)
       ((cmp_typ t), (Ll.Id ans_id), code1 >@ code2 >:: I (ans_id,
                                                           (cmp_binop bop ans_ty1 op1 op2)))
-    | Ast.NewArr (ty,e1,id,e2) -> failwith "unimplemented"
+    | _ -> failwith "unimplemented"
+      (*Ast.NewArr (typ, e1, id, e2) ->
+      let (e1_ty, e1_op, e1_code) = (cmp_exp c t e1) in
+      let op, strm = oat_alloc_array_dynamic typ e1_op  in*)
+      
+
   end
 
 (* Compile a path as a left-hand-side --------------------------------------- *)
@@ -473,7 +478,7 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
    the desired translation type.                                              *)
 
 and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  
+
   let cmp_accessor (x: typ* string * stream)  (a: accessor) =
     begin match x with
       | (x, y, z) ->
@@ -490,10 +495,10 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
         let str = gensym "index" in
         let ll_ty, ll_op, ll_strm = begin match a.elt with
           | Index i ->
-             cmp_exp c (no_loc TInt) i
+            cmp_exp c (no_loc TInt) i
           | _ -> failwith "not an index"
-         end in
-        
+        end in
+
         let myuid = gensym "load" in
         (t, str, z @ ll_strm  @ [I(myuid, (Load (Ptr(cmp_typ x), Id y)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
     end
@@ -564,7 +569,7 @@ and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 
     let ast_typ, op, str = cmp_path_lhs c p in
     let uid = (gensym "load") in
-    
+
     ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
   | Call (id, lst) -> 
 
@@ -692,30 +697,30 @@ and cmp_stmt (c:ctxt) (rt:rtyp) (stmt : Ast.stmt) : ctxt * stream =
     c, s1>@s2>@[I(gensym "Assn", (Store (t2, o2, o1)))]
 
   | Ast.SCall p -> 
-          begin match (List.nth p 0).elt with
-          | Call (id, lst) -> 
-                  let gid, (atyplst, rtyp) = lookup_function id.elt c in    
-                  let f (i: int)  (x: Ast.exp) =
-                      let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
-                      (ty, (op, str)) in
+    begin match (List.nth p 0).elt with
+      | Call (id, lst) -> 
+        let gid, (atyplst, rtyp) = lookup_function id.elt c in    
+        let f (i: int)  (x: Ast.exp) =
+          let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
+          (ty, (op, str)) in
 
-                        let typ_lst, temp  = List.split(List.mapi f lst) in
-                        let op_lst, str_lst_lst = List.split temp in
-                        let str_lst = List.flatten (List.rev str_lst_lst) in
-                        let uid = gensym "scall" in
+        let typ_lst, temp  = List.split(List.mapi f lst) in
+        let op_lst, str_lst_lst = List.split temp in
+        let str_lst = List.flatten (List.rev str_lst_lst) in
+        let uid = gensym "scall" in
 
-                  let ll_rtyp =
-                      begin match rtyp with
-                      | None -> Void
-                      | Some r -> cmp_typ r
-                      end
-                      in
+        let ll_rtyp =
+          begin match rtyp with
+            | None -> Void
+            | Some r -> cmp_typ r
+          end
+        in
 
-                    let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
-                    (c, str_lst >@ [call_elt])
+        let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
+        (c, str_lst >@ [call_elt])
 
-            | _ -> failwith "illegal first element for scall"
-            end
+      | _ -> failwith "illegal first element for scall"
+    end
 
 
   | Ast.Decl d ->
@@ -970,7 +975,7 @@ let rec cmp_init (ty:Ast.typ) (init:Ast.exp) :  Ll.ty * Ll.ginit * ll_globals =
           let gid3 = gensym "array"in
           let array_globals_2 = array_globals
                                 @ [(gid, (Struct[I64; Array (List.length a, a_ll_ty)],
-                                           GStruct [(I64, GInt (Int64.of_int (List.length a)));
+                                          GStruct [(I64, GInt (Int64.of_int (List.length a)));
                                                    (Array (List.length a, a_ll_ty), GArray array_gdecls)]))]
           in
           (Ptr(Struct [I64; Array (List.length a, a_ll_ty)]), GGid gid, array_globals_2)    
