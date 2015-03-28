@@ -147,6 +147,19 @@ and cmp_ref (r:Ast.ref) =
   | Ast.RString  -> I8
   | Ast.RArray u -> Struct [I64; Array(0, cmp_typ u)]
 
+
+
+let rec cmp_typ2 (t:Ast.typ) =
+  match t.elt with
+  | Ast.TBool  -> t_bool
+  | Ast.TInt   -> t_int
+  | Ast.TRef r -> (cmp_ref2 r)
+
+and cmp_ref2 (r:Ast.ref) =
+  match r.elt with
+  | Ast.RString  -> I8
+  | Ast.RArray u -> Struct [I64; Array(0, cmp_typ2 u)]
+
 let cmp_rtyp r =
   match r with
   | None -> Void
@@ -291,10 +304,11 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
                               Const (1L);
                               Const (Int64.of_int ind)
                             ])))] >@
-                            [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
+                            [I(gensym "store",(Store
+                            ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
                 end in
             
-            let codes = [I(na, (Ll.Alloca (cmp_typ t)))] in
+            let codes = [I(na, (Ll.Alloca (cmp_typ2 t)))] in
             let codes2 = init_array consts 0 codes in
   
             (cmp_typ t),(Id na),codes2
