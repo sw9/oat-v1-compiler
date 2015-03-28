@@ -298,12 +298,11 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       let strm_lst = List.flatten strm_lst_lst in
       
       let copy_consts (i: int) (c: const) =
-        
         let gid = gensym "array" in
         let gid2 = gensym "array" in
-        
+
         [I(gid, Gep (cmp_typ t, op, gep_array_index (i64_op_of_int i)))] @
-        [I(gid2, Store(cmp_typ  a_ty, (List.nth op_lst i), Gid gid))]
+        [I(gid2, Store(cmp_typ  a_ty, (List.nth op_lst i), Id gid))]
       in
 
       let cpy_strm_lst_lst = List.mapi copy_consts consts in
