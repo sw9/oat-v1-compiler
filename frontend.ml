@@ -309,55 +309,55 @@ let rec cmp_const  (cn:Ast.const) (t:Ast.typ) : Ll.ty * Ll.operand * stream =
       let cpy_strm_lst =  List.rev (List.flatten cpy_strm_lst_lst ) in
       (cmp_typ t, op, strm >@ strm_lst >@ cpy_strm_lst)
 
-      (*let my_ty = cmp_typ t in
+    (*let my_ty = cmp_typ t in
       let na = (gensym "arr_op") in
       let codes = [I(na, (Ll.Alloca (cmp_typ t)))] in
 
       let rec find_type first =
-        begin match first.elt with
-          | Ast.CInt i -> Ast.no_loc (Ast.TInt)
-          | Ast.CBool b -> Ast.no_loc (Ast.TBool)
-          | Ast.CNull  -> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
-          | Ast.CStr s-> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
-          | Ast.CArr a-> (find_type (List.nth a 0))
-        end in
-        
+      begin match first.elt with
+        | Ast.CInt i -> Ast.no_loc (Ast.TInt)
+        | Ast.CBool b -> Ast.no_loc (Ast.TBool)
+        | Ast.CNull  -> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+        | Ast.CStr s-> Ast.no_loc (Ast.TRef(Ast.no_loc Ast.RString))
+        | Ast.CArr a-> (find_type (List.nth a 0))
+      end in
+
       let my_typ = find_type fir in
 
       let rec init_array c ind cs =
-        begin match c with
-          | [] -> cs
-          | x::y -> let uid = (gensym "elem") in
-            init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
-                                                      [   Const (0L);
-                                                          Const (1L);
-                                                          Const (Int64.of_int ind)
-                                                      ])))] >@
-            [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
-        end in
+      begin match c with
+        | [] -> cs
+        | x::y -> let uid = (gensym "elem") in
+          init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
+                                                    [   Const (0L);
+                                                        Const (1L);
+                                                        Const (Int64.of_int ind)
+                                                    ])))] >@
+          [I(gensym "store",(Store ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
+      end in
 
       let codes2 = init_array consts 0 codes in
 
-            let fir = List.nth consts 0 in
-            let my_typ = find_type fir in
-            
-            let rec init_array c ind cs =
-                begin match c with
-                | [] -> cs
-                | x::y -> let uid = (gensym "elem") in
-                          init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
-                          [   Const (0L);
-                              Const (1L);
-                              Const (Int64.of_int ind)
-                            ])))] >@
-                            [I(gensym "store",(Store
-                            ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
-                end in
-            
-            let codes = [I(na, (Ll.Alloca (cmp_typ2 t)))] in
-            let codes2 = init_array consts 0 codes in
-  
-            (cmp_typ t),(Id na),codes2
+          let fir = List.nth consts 0 in
+          let my_typ = find_type fir in
+
+          let rec init_array c ind cs =
+              begin match c with
+              | [] -> cs
+              | x::y -> let uid = (gensym "elem") in
+                        init_array y (ind+1) cs >@ [I(uid,(Ll.Gep(my_ty, (Ll.Id (na)),
+                        [   Const (0L);
+                            Const (1L);
+                            Const (Int64.of_int ind)
+                          ])))] >@
+                          [I(gensym "store",(Store
+                          ((cmp_typ(my_typ)),(Ll.Const 0L),(Id uid))))] 
+              end in
+
+          let codes = [I(na, (Ll.Alloca (cmp_typ2 t)))] in
+          let codes2 = init_array consts 0 codes in
+
+          (cmp_typ t),(Id na),codes2
       (cmp_typ t),(Id na),codes2*)
   end
 
@@ -449,23 +449,23 @@ let rec cmp_exp (c:ctxt) (t:typ) (exp:exp) : (Ll.ty * Ll.operand * stream) =
       let cond_op2 = gensym "cond_op2" in
       let merge_label = (gensym "merge") in
       let if_label = (gensym "if") in
-      
+
       let nc = add_local c (id) (counter_alloca, no_loc TInt) in
       let exp_ty, exp_op, exp_strm = cmp_exp nc typ e2 in
       let gep_id = gensym "getelementptr" in
       let add_res = gensym "add" in
-      
+
       (cmp_typ @@ ast_array_typ typ, op, e1_code >@  strm >@  [I (arr_id, Gep ((cmp_typ @@ ast_array_typ typ), op, gep_array_len))] >@
-      [I(size, Load(Ptr I64, Id arr_id))] >@
-      [I(counter_alloca, (Ll.Alloca (I64)))] >@
-      [I(gensym "store", Store(I64, i64_op_of_int 0, Id counter_alloca))] >@ [T (Br (cond_label))] >@
-      [L cond_label]  >@
-      [I(cond_op, Load(Ptr I64, Id counter_alloca))] >@
-      [I(cond_op2, Icmp (Slt, I64, Id cond_op, Id size))]  >@
-      [T (Cbr (Id cond_op2, if_label, merge_label))] >@
-      [L if_label] >@
-      exp_strm >@ [I(gep_id, Gep (cmp_typ @@ ast_array_typ typ, op, gep_array_index (Id cond_op)))] >@
-      [I(gensym "store", Store(cmp_typ typ, exp_op, Id gep_id))] >@ [I(add_res, Binop(Add, I64, Id cond_op, i64_op_of_int 1))] >@
+                                         [I(size, Load(Ptr I64, Id arr_id))] >@
+                                         [I(counter_alloca, (Ll.Alloca (I64)))] >@
+                                         [I(gensym "store", Store(I64, i64_op_of_int 0, Id counter_alloca))] >@ [T (Br (cond_label))] >@
+                                         [L cond_label]  >@
+                                         [I(cond_op, Load(Ptr I64, Id counter_alloca))] >@
+                                         [I(cond_op2, Icmp (Slt, I64, Id cond_op, Id size))]  >@
+                                         [T (Cbr (Id cond_op2, if_label, merge_label))] >@
+                                         [L if_label] >@
+                                         exp_strm >@ [I(gep_id, Gep (cmp_typ @@ ast_array_typ typ, op, gep_array_index (Id cond_op)))] >@
+                                         [I(gensym "store", Store(cmp_typ typ, exp_op, Id gep_id))] >@ [I(add_res, Binop(Add, I64, Id cond_op, i64_op_of_int 1))] >@
                                          [I(gensym "store", Store(I64, Id add_res, Id counter_alloca))]
                                          >@ [T (Br cond_label)]>@ [L merge_label])
 
@@ -525,10 +525,194 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
           | _ -> failwith "not an index"
         end in
 
-        let myuid = gensym "load" in
-        (t, str, z @ ll_strm  @ [I(myuid, (Load (Ptr(cmp_typ x), Id y)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
+        let myuid = gensym "load_lhs" in
+        (t, str, z @ (List.rev ll_strm)  @ [I(myuid, (Load (Ptr(cmp_typ x), Id y)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
     end
   in
+
+  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
+    begin match x with
+      | (x, y, z) ->
+        let t =
+          begin match x.elt with
+            | TRef x ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "incorrect type"
+              end
+            | _ -> failwith "incorrect type"
+          end in
+
+        let str = gensym "index" in
+        let ll_ty, ll_op, ll_strm = begin match a.elt with
+          | Index i ->
+            cmp_exp c (no_loc TInt) i
+          | _ -> failwith "not an index"
+        end in
+
+        let myuid = gensym "loader" in
+        let myuid2 = gensym "store" in
+        let myuid3 = gensym  "store" in
+        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
+        (t, str, z @ (List.rev ll_strm) @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
+    end
+  in
+
+
+  begin match (List.nth p 0).elt with
+    | Field id ->
+      let lu = (List.mem_assoc id.elt c.local) in
+      begin match lu with
+        | false ->  let gu = (List.mem_assoc id.elt c.global) in
+          begin match gu with
+            | false -> let hu = (Hashtbl.mem gen_table id.elt) in
+              begin match hu with
+                | false -> failwith "Variable not declared"
+                | true -> 
+                  let (uid, ty)  = (Hashtbl.find gen_table id.elt) in
+                  if List.length p == 1 then
+                    (ty, Ll.Id uid, [])
+                  else
+                    let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
+                    (new_ty, (Id new_str), List.rev new_strm)
+              end
+
+            | true -> let (uid, ty, llty)  = (lookup_global id.elt c) in
+              let myuid = (gensym "Bitcast") in
+              let str_begin = [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))] in
+              if List.length p == 1 then               
+                (ty, (Ll.Id myuid), str_begin)
+              else
+                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid, str_begin) (List.tl p) in
+                (new_ty, (Id new_str), List.rev new_strm)
+          end
+        | true ->  let (uid, ty)  = (lookup_local id.elt c) in
+          if List.length p == 1 then
+            (ty, Ll.Id uid, [])
+          else
+            let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
+            (new_ty, (Id new_str), List.rev new_strm)
+      end
+    | Call (id, explist) -> let (t,o,s) = cmp_path_exp2 c p in (t,o,s)
+                            (*
+                            begin match o with
+                            | Id u ->
+                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, u, []) (List.tl p) in
+                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
+                            | Gid g ->
+                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, g, []) (List.tl p) in
+                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
+                            end 
+                            *)
+    | _ -> failwith "invalid path"
+
+  end
+
+(* Checks that p is a valid path expression, meaning that it is either:
+    -  just a well-typed call to a non-void function
+    -  or, a non-empty path that is valid as a left-hand-side, from which 
+       a value can be loaded.
+
+    Example valid expression paths:
+      Oat:     Ast path:
+    f(17)     [Call("f", [Const(17)])]
+    x         [Field("x")]
+    x[3]      [Field("x"); Index(Const(3L))]
+    x[3][4]   [Field("x"); Index(Const(3L)); Index(Const(4))]
+    f(17)[3]  [Call("f", [Const(17)]); Index(Const(3))]
+
+   Invariant: the result of compiling a path as an expression is the
+   *source* type t of the path expression, an operand of type (cmp_typ
+   t), and a stream that computes the value of the path expression into
+   the returned operand.
+
+   Note: if path is not just a call, you can compile it as a left-hand-side
+   and the load from the resulting pointer.                                  *)
+
+and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
+
+
+  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
+    begin match x with
+      | (x, y, z) ->
+        let t =
+          begin match x.elt with
+            | TRef x ->
+              begin match x.elt with
+                | RArray t -> t
+                | _ -> failwith "incorrect type"
+              end
+            | _ -> failwith "incorrect type"
+          end in
+
+        let str = gensym "index" in
+        let ll_ty, ll_op, ll_strm = begin match a.elt with
+          | Index i ->
+            cmp_exp c (no_loc TInt) i
+          | _ -> failwith "not an index"
+        end in
+
+        let myuid = gensym "loader" in
+        let myuid2 = gensym "store" in
+        let myuid3 = gensym  "store" in
+        let myuid4  = gensym "load_cmp_exp" in
+
+        let deref =  [I(myuid4,(Load(Ptr(cmp_typ t), Id str)))] in
+
+        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
+        (t, myuid4, z @ List.rev ll_strm @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))] 
+                    @ deref)
+    end
+  in
+
+
+  begin match (List.nth p 0).elt with
+    | Field id ->
+
+      let ast_typ, op, str = cmp_path_lhs c p in
+      let uid = (gensym "load_field_id") in
+
+      ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
+    | Call (id, lst) -> 
+
+      let gid, (atyplst, rtyp) = lookup_function id.elt c in    
+      let f (i: int)  (x: Ast.exp) =
+        let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
+        (ty, (op, str)) in
+
+      let typ_lst, temp  = List.split(List.mapi f lst) in
+      let op_lst, strlst_lst = List.split temp in
+      let str_lst = List.flatten (List.rev strlst_lst) in
+      let uid = gensym "caller" in
+
+      let ll_rtyp =
+        match rtyp with
+        | None -> failwith "can't be void"
+        | Some r -> cmp_typ r
+      in
+
+      let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
+      let ast_typ =
+        match rtyp with
+        | None -> failwith "can't have void function"
+        | Some r -> r
+      in
+
+      if (List.length p) = 1  then begin 
+        (ast_typ, Id uid, str_lst >@ [call_elt])
+      end
+
+      else 
+        let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (ast_typ, uid, []) (List.tl p) in
+        (new_ty, (Id new_str), str_lst >@ [call_elt] >@ (List.rev new_strm))
+
+    | _ -> failwith "invalid type for 0th element"
+
+  end
+
+
+and cmp_path_exp2 (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
+
 
   let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
     begin match x with
@@ -561,238 +745,51 @@ and cmp_path_lhs (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
 
   begin match (List.nth p 0).elt with
     | Field id ->
-      let lu = (List.mem_assoc id.elt c.local) in
-      begin match lu with
-        | false ->  let gu = (List.mem_assoc id.elt c.global) in
-          begin match gu with
-            | false -> let hu = (Hashtbl.mem gen_table id.elt) in
-                       begin match hu with
-                       | false -> failwith "Variable not declared"
-                       | true -> 
-                            let (uid, ty)  = (Hashtbl.find gen_table id.elt) in
-                              if List.length p == 1 then
-                                (ty, Ll.Id uid, [])
-                              else
-                                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
-                                (new_ty, (Id new_str), List.rev new_strm)
-                       end
 
-            | true -> let (uid, ty, llty)  = (lookup_global id.elt c) in
-              let myuid = (gensym "Bitcast") in
-              let str_begin = [I(myuid, (Bitcast (Ptr llty, Ll.Gid uid, Ptr(cmp_typ ty))))] in
-              if List.length p == 1 then               
-                (ty, (Ll.Id myuid), str_begin)
-              else
-                let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, myuid, str_begin) (List.tl p) in
-                (new_ty, (Id new_str), List.rev new_strm)
-          end
-        | true ->  let (uid, ty)  = (lookup_local id.elt c) in
-          if List.length p == 1 then
-            (ty, Ll.Id uid, [])
-          else
-            let new_ty, new_str, new_strm = List.fold_left cmp_accessor (ty, uid, []) (List.tl p) in
-            (new_ty, (Id new_str), List.rev new_strm)
+      let ast_typ, op, str = cmp_path_lhs c p in
+      let uid = (gensym "load_field_id") in
+
+      ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
+    | Call (id, lst) -> 
+
+
+      let gid, (atyplst, rtyp) = lookup_function id.elt c in    
+      let f (i: int)  (x: Ast.exp) =
+        let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
+        (ty, (op, str)) in
+
+      let typ_lst, temp  = List.split(List.mapi f lst) in
+      let op_lst, strlst_lst = List.split temp in
+      let str_lst = List.flatten (List.rev strlst_lst) in
+      let uid = gensym "calller" in
+
+      let ll_rtyp =
+        match rtyp with
+        | None -> failwith "can't be void"
+        | Some r -> cmp_typ r
+      in
+
+      let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
+      let ast_typ =
+        match rtyp with
+        | None -> failwith "can't have void function"
+        | Some r -> r
+      in
+
+      if (List.length p) = 1  then begin 
+        (ast_typ, Id uid, str_lst >@ [call_elt])
       end
-    | Call (id, explist) -> let (t,o,s) = cmp_path_exp2 c p in (t,o,s)
-                            (*
-                            begin match o with
-                            | Id u ->
-                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, u, []) (List.tl p) in
-                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
-                            | Gid g ->
-                            let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (t, g, []) (List.tl p) in
-                            (new_ty, (Id new_str), s >@ (List.rev new_strm))
-                            end 
-                            *)
-                            
+
+      else 
+        let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (ast_typ, uid, []) (List.tl p) in
+        (new_ty, (Id new_str), str_lst >@ [call_elt] >@ (List.rev new_strm))
+
+
+
+
+    | _ -> failwith "invalid type for 0th element"
+
   end
-
-(* Checks that p is a valid path expression, meaning that it is either:
-    -  just a well-typed call to a non-void function
-    -  or, a non-empty path that is valid as a left-hand-side, from which 
-       a value can be loaded.
-
-    Example valid expression paths:
-      Oat:     Ast path:
-    f(17)     [Call("f", [Const(17)])]
-    x         [Field("x")]
-    x[3]      [Field("x"); Index(Const(3L))]
-    x[3][4]   [Field("x"); Index(Const(3L)); Index(Const(4))]
-    f(17)[3]  [Call("f", [Const(17)]); Index(Const(3))]
-
-   Invariant: the result of compiling a path as an expression is the
-   *source* type t of the path expression, an operand of type (cmp_typ
-   t), and a stream that computes the value of the path expression into
-   the returned operand.
-
-   Note: if path is not just a call, you can compile it as a left-hand-side
-   and the load from the resulting pointer.                                  *)
-
-and cmp_path_exp (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  
-    
-  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
-    begin match x with
-      | (x, y, z) ->
-        let t =
-          begin match x.elt with
-            | TRef x ->
-              begin match x.elt with
-                | RArray t -> t
-                | _ -> failwith "incorrect type"
-              end
-            | _ -> failwith "incorrect type"
-          end in
-
-        let str = gensym "index" in
-        let ll_ty, ll_op, ll_strm = begin match a.elt with
-          | Index i ->
-            cmp_exp c (no_loc TInt) i
-          | _ -> failwith "not an index"
-        end in
-
-        let myuid = gensym "loader" in
-        let myuid2 = gensym "store" in
-        let myuid3 = gensym  "store" in
-        let myuid4  = gensym "load" in
-
-        let deref =  [I(myuid4,(Load(Ptr(cmp_typ t), Id str)))] in
-
-        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
-        (t, myuid4, z @ ll_strm @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))] 
-        @ deref)
-    end
-  in
-
-    
-begin match (List.nth p 0).elt with
-  | Field id ->
-
-    let ast_typ, op, str = cmp_path_lhs c p in
-    let uid = (gensym "load") in
-
-    ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
-  | Call (id, lst) -> 
-
-
-    let gid, (atyplst, rtyp) = lookup_function id.elt c in    
-    let f (i: int)  (x: Ast.exp) =
-      let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
-      (ty, (op, str)) in
-
-    let typ_lst, temp  = List.split(List.mapi f lst) in
-    let op_lst, strlst_lst = List.split temp in
-    let str_lst = List.flatten (List.rev strlst_lst) in
-    let uid = gensym "calller" in
-
-    let ll_rtyp =
-      match rtyp with
-      | None -> failwith "can't be void"
-      | Some r -> cmp_typ r
-    in
-
-    let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
-    let ast_typ =
-      match rtyp with
-      | None -> failwith "can't have void function"
-      | Some r -> r
-    in
-    
-    if (List.length p) = 1  then begin 
-        (ast_typ, Id uid, str_lst >@ [call_elt])
-    end
-
-    else 
-        let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (ast_typ, uid, []) (List.tl p) in
-        (new_ty, (Id new_str), str_lst >@ [call_elt] >@ (List.rev new_strm))
-
-
-
-
-  | _ -> failwith "invalid type for 0th element"
-
-end
-
-
-and cmp_path_exp2 (c:ctxt) (p:path) : Ast.typ * Ll.operand * stream =
-  
-    
-  let cmp_accessor2 (x: typ* string * stream)  (a: accessor) =
-    begin match x with
-      | (x, y, z) ->
-        let t =
-          begin match x.elt with
-            | TRef x ->
-              begin match x.elt with
-                | RArray t -> t
-                | _ -> failwith "incorrect type"
-              end
-            | _ -> failwith "incorrect type"
-          end in
-
-        let str = gensym "index" in
-        let ll_ty, ll_op, ll_strm = begin match a.elt with
-          | Index i ->
-            cmp_exp c (no_loc TInt) i
-          | _ -> failwith "not an index"
-        end in
-
-        let myuid = gensym "loader" in
-        let myuid2 = gensym "store" in
-        let myuid3 = gensym  "store" in
-        let bcinsn = [I(myuid2, (Ll.Alloca (cmp_typ (x))))] @ [I(myuid2,(Store((cmp_typ x), Id y, Id myuid2)))] in
-        (t, str, z @ ll_strm @ bcinsn  @ [I(myuid, (Load (Ptr(cmp_typ x), Id myuid2)))] @ [I(str, Gep (cmp_typ x, Id myuid, gep_array_index ll_op))])
-    end
-  in
-
-    
-begin match (List.nth p 0).elt with
-  | Field id ->
-
-    let ast_typ, op, str = cmp_path_lhs c p in
-    let uid = (gensym "load") in
-
-    ast_typ, (Id uid), str >::I(uid, (Load (Ptr (cmp_typ ast_typ), op)))
-  | Call (id, lst) -> 
-
-
-    let gid, (atyplst, rtyp) = lookup_function id.elt c in    
-    let f (i: int)  (x: Ast.exp) =
-      let ty, op, str = cmp_exp c (List.nth atyplst i) x  in
-      (ty, (op, str)) in
-
-    let typ_lst, temp  = List.split(List.mapi f lst) in
-    let op_lst, strlst_lst = List.split temp in
-    let str_lst = List.flatten (List.rev strlst_lst) in
-    let uid = gensym "calller" in
-
-    let ll_rtyp =
-      match rtyp with
-      | None -> failwith "can't be void"
-      | Some r -> cmp_typ r
-    in
-
-    let call_elt = I(uid, Call(ll_rtyp, Gid gid, (List.combine typ_lst op_lst))) in
-    let ast_typ =
-      match rtyp with
-      | None -> failwith "can't have void function"
-      | Some r -> r
-    in
-    
-    if (List.length p) = 1  then begin 
-        (ast_typ, Id uid, str_lst >@ [call_elt])
-    end
-
-    else 
-        let new_ty, new_str, new_strm = List.fold_left cmp_accessor2 (ast_typ, uid, []) (List.tl p) in
-        (new_ty, (Id new_str), str_lst >@ [call_elt] >@ (List.rev new_strm))
-
-
-
-
-  | _ -> failwith "invalid type for 0th element"
-
-end
 
 
 
@@ -802,11 +799,11 @@ let rec cmp_decls c rt d ans: ctxt*stream =
   begin match d with
     | [] -> c, ans
     | d::rest ->
-        let d_cont = d.elt in
-        let new_id = (gensym d_cont.id.elt) in
-        Hashtbl.add gen_table d_cont.id.elt (new_id,d_cont.ty);
-        let new_d = Ast.no_loc {ty = d_cont.ty; id = Ast.no_loc(new_id); init = d_cont.init } in 
-        let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl new_d)) in
+      let d_cont = d.elt in
+      let new_id = (gensym d_cont.id.elt) in
+      Hashtbl.add gen_table d_cont.id.elt (new_id,d_cont.ty);
+      let new_d = Ast.no_loc {ty = d_cont.ty; id = Ast.no_loc(new_id); init = d_cont.init } in 
+      let (c1, s) = cmp_stmt c rt (Ast.no_loc(Ast.Decl new_d)) in
       (cmp_decls c1 rt rest (ans >@ s))
   end
 
@@ -982,9 +979,9 @@ and whileloop c rt exp b1 c1: stream =
   let cond_label = (gensym "cond") in
   let merge_label = (gensym "merge") in
   (* [L cond_label] >@ c1 >@  
-  [T (Cbr (exp, if_label, merge_label))] >@
-  [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@
-  [L merge_label]*)
+     [T (Cbr (exp, if_label, merge_label))] >@
+     [L if_label] >@ e_b1 >@ [T (Br cond_label)]>@
+     [L merge_label]*)
   [] >@
   [T (Br (cond_label))] >@
   [L cond_label]  >@ c1 >@
@@ -1048,22 +1045,23 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
   let func_fty = (arg_typs, rettyp) in
   let func_param = List.map arg_id args in
 
-  let alloca_args  (x: typ * id) =
+  let alloca_args2  (x: typ * id) =
     begin match x with
       | (x, y) ->
         let uid = gensym "alloca" in
-        (uid, (Alloca (cmp_typ x)))::(gensym "alloca", (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
+        I(uid, (Alloca (cmp_typ x)))::I(gensym "alloca", (Store ((cmp_typ x), (Id y.elt), (Id uid))))::[]
     end
   in
 
-  let args_elt =  (List.map alloca_args args) in
+  let args_elt2 =  (List.map alloca_args2 args) in
 
-  let uid_lst (i: int) (x: (string * Ll.insn) list) =
+  let uid_lst (i: int) (x: elt list) =
     begin match (List.nth x 0) with
-      | (uid, y) ->
+      | I (uid, y) ->
         begin match (List.nth args i) with
           | (typ, id) -> (id, uid, typ) 
-        end   
+        end
+      | _ -> failwith "not an I"
     end in
 
   let update_ctxt (c: ctxt) (x: Ast.id * string * Ast.typ) =
@@ -1072,18 +1070,12 @@ let cmp_fdecl (c:ctxt) {elt={rtyp; name; args; body}} :
     end
   in
 
-  let nc = List.fold_left update_ctxt c (List.mapi uid_lst args_elt) in
-
+  let nc = List.fold_left update_ctxt c (List.mapi uid_lst args_elt2) in
   let new_ctxt, strm = cmp_block nc rtyp body in
   (* List.iter (print_string_of_elt) strm; *)
-  let func_cfg, func_llglobals = build_cfg strm in
+  let func_cfg, func_llglobals = build_cfg (List.rev (List.flatten args_elt2) >@ strm) in
   let beginning_block, other_blocks = func_cfg in
-
-  let block_insns = beginning_block.insns in
-
-  let new_block = {insns = ((List.flatten args_elt) @ block_insns); terminator=beginning_block.terminator} in
-  let new_cfg = (new_block, other_blocks) in
-  ((name.elt, {fty=func_fty; param=func_param; cfg=new_cfg}), func_llglobals)
+  ((name.elt, {fty=func_fty; param=func_param; cfg=func_cfg}), func_llglobals)
 
 
 (* compile all of the fdecls ------------------------------------------------ *)
