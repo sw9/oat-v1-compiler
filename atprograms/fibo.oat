@@ -1,0 +1,28 @@
+int fibR(int n) {
+    if(n == 0) {return 0;}
+    if(n == 1) {return 1;}
+    return fibR(n - 1) + fibR(n-2);
+}
+
+int fibI(int n) {
+    int a = 0;
+    int b = 1;
+    if(n == 0) {return a;}
+    if(n == 1) {return b;}
+    while(n-2 > 0) {
+        int old = b;
+        b = b + a;
+        a = old;
+        n = n - 1;
+    }
+    return a + b;
+}
+
+int program (int argc, string[] argv) 
+{
+    int val = 1;
+    if(fibR(12) == 144 & fibI(12) == 144) {val = 0;}
+    return val;
+
+
+}

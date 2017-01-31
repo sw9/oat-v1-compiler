@@ -1,0 +1,120 @@
+int meaning_of_life = 42;
+bool kesha_to_fling = true;
+string professor = "Zdancewic!";
+int[] global_arr = {1, 1, 2, 3, 5, 8, 13};
+int[] null_arr = null;
+int[] ideal_341_midterm_score = {100};
+int[] actual_341_midterm_score = {0};
+
+int four () {
+  string hakuna_matata = "Meaning of Life";
+  int what_is_the = meaning_of_life;
+  int what_rhymes_with_moore = meaning_of_life - global_arr[5] * global_arr[4] + global_arr[2];
+  return 0 + what_rhymes_with_moore;
+}
+
+int[] asian_brother_of_foo_named_fui (string s, bool b, int i) {
+  int[] fui = global_arr;
+  return fui;
+}
+
+void dfs (int[][] arr, int[][] visited, int row, int col, int i, int j) {
+  if (i - 1 >= 0) {
+    if (visited[i - 1][j] != 1) {
+      visited[i - 1][j] = 1;
+
+      if (arr[i - 1][j] == 1) {
+        dfs(arr, visited, row, col, i - 1, j);
+      }
+    }
+  }
+
+  if (i + 1 < row) {
+    if (visited[i + 1][j] != 1) {
+      visited[i + 1][j] = 1;
+
+      if (arr[i + 1][j] == 1) {
+        dfs(arr, visited, row, col, i + 1, j);
+      }
+    }
+  }
+
+  if (j - 1 >= 0) {
+    if (visited[i][j - 1] != 1) {
+      visited[i][j - 1] = 1;
+
+      if (arr[i][j - 1] == 1) {
+        dfs(arr, visited, row, col, i, j - 1);
+      }
+    }
+  }
+
+  if (j + 1 < col) {
+    if (visited[i][j + 1] != 1) {
+      visited[i][j + 1] = 1;
+
+      if (arr[i][j + 1] == 1) {
+        dfs(arr, visited, row, col, i, j + 1);
+      }
+    }
+  }
+
+  return;
+}
+
+int connected (int[][] arr, int row, int col) {
+  int[][] visited = new int[][row] { i1 => new int[col] { i11 => 0 }};
+  int counter = 0;
+
+  for (int i = 0; i < row; i = i + 1;) {
+    int j = 0;
+    
+    while (j < col) {
+    if (visited[i][j] == 0) {
+      visited[i][j] = 1;
+      
+      if (arr[i][j] == 1) {
+        counter = counter + 1;
+
+        dfs(arr, visited, row, col, i, j);
+      }
+    }
+
+    j = j + 1;
+    }
+  }
+
+  return counter;
+}
+
+int program (int argc, string[] argv) {
+  int[][] territory_a = {{ 1, 0, 1, 0 }, {1, 1, 0, 1}, {1, 0, 1, 1}, {0, 1, 1, 0}};
+  int[][] territory_b = {{0, 0, 1, 0, 1}, {0, 1, 1, 0, 1}, {1, 1, 1, 1, 1}};
+  int[][] territory_c = {{1, 0, 1}, {0, 1, 0}, {1, 0, 1}};
+  int[][] none_conquered = new int[][four()] { i1 => new int[2] { i11 => actual_341_midterm_score[0] }};
+  int[][] all_conquered = new int[][6] { i2 => new int[6] { i21 => i2 * 0 + 1 }};
+  int[][] island = {{}};
+  int[][] emptyland = new int[][1] { i3 => new int[1] { i31 => asian_brother_of_foo_named_fui(professor,kesha_to_fling,ideal_341_midterm_score[0])[1] }};
+  all_conquered = all_conquered;
+  int[][] temp = island;
+  island = emptyland;
+  emptyland = temp;
+
+  print_string("My name is Jeff...\n");
+
+  int a = connected(territory_a, 4, 4);
+  int b = connected(territory_b, 3, 5);
+  int c = connected(territory_c, 3, 3);
+  int none = connected(none_conquered, 4, 2);
+  int all = connected(all_conquered, 6, 6);
+  int i = connected(island, 1, 1);
+  int e = connected(emptyland, 0, 0);
+  
+  if (a == 3 & b == 1 & c == 5 & none == 0 & all == 1 & i == 1 & e == 0) {
+    print_string("Charizard is the BEST Pokemon ever!!!");
+  }
+
+  int sum = a + b + c + none + all + i + e;
+
+  return sum;
+}

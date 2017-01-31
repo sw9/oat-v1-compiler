@@ -1,0 +1,30 @@
+void bubble_sort(int[] arr, int len) {
+    bool swapped = true;
+    while(swapped) {
+        swapped = false;
+        for (int i = 0; i < len-1; i = i+1;) {
+            if (arr[i] > arr[i+1]) {
+                int temp = arr[i];
+                arr[i] = arr[i+1];
+                arr[i+1] = temp;
+                swapped = true;
+            }
+        }
+    }
+    return;
+}
+
+int program (int argc, string[] argv) {
+    int[][] arr = new int[][10] { i => new int[10]{ j => 10*i-j }};
+    int val = 0;
+    for (int i = 0; i < 10; i = i+1;) {
+        bubble_sort(arr[i], 10);
+        val = val + arr[i][i];
+    }
+
+    if (val == 405) {
+        return 1;
+    } else {
+        return 0;
+    }
+}

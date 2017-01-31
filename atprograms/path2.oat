@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  int x = 17;
+  int y = 18;
+  return x + y;
+}

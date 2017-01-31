@@ -1,0 +1,54 @@
+int len = 4;
+
+int check(int[][] board, int i, int j, int count) {
+    if ((i >= 0) & (j >= 0) & (i < len) & (j < len)) {
+        return count + board[i][j];
+    } else {
+        return count;
+    }
+}
+
+int val_at(int[][] board, int i, int j) {
+    int alive = board[i][j];
+    int count = 0;
+    count = check(board, i-1, j-1, count);
+    count = check(board, i-1, j  , count);
+    count = check(board, i-1, j+1, count);
+
+    count = check(board, i  , j-1, count);
+    count = check(board, i  , j+1, count);
+
+    count = check(board, i+1, j-1, count);
+    count = check(board, i+1, j  , count);
+    count = check(board, i+1, j+1, count);
+
+    if (alive == 1) {
+        if (count < 2) {
+            return 0;
+        } else if (count < 4) {
+            return 1;
+        }
+        return 0;
+    }
+    if (count == 3) {
+        return 1;
+    } else {
+        return 0;
+    }
+    return 0;
+}
+
+int program (int argc, string[] argv) {
+    int[][] board = { {0, 0, 0, 0},
+                      {0, 1, 1, 1},
+                      {1, 1, 1, 0},
+                      {0, 0, 0, 0} };
+
+    int[][] new_board = new int[][4]{ i => new int[4]{ j => val_at(board, i, j) } };
+    for (int i = 0; i < len; i = i+1;) {
+        for (int j = 0; j < len; j = j+1;) {
+            print_int(new_board[i][j]);
+        }
+    }
+    return 0;
+}

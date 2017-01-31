@@ -1,0 +1,29 @@
+int sieve(int n) {
+  bool[] arr = new bool[n]{ i => true};
+
+  arr[0] = false;
+  arr[1] = false;
+
+  for(int i = 0; i < n; i=i+1;) {
+    if(arr[i]){
+      for(int j = i * 2; j < n; j=j+i;){
+        arr[j] = false;
+      }
+    }
+  }
+
+  int count = 0;
+  for(int i = 0; i < n; i=i+1;){
+    if(arr[i]) {
+      count = count + 1;
+    }
+  }
+
+  return count;
+
+}
+
+int program(int argc, string[] argv) {
+  int n = 100;
+  return sieve(n);
+}

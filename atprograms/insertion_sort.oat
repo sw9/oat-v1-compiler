@@ -1,0 +1,37 @@
+int[] insert(int[] partial, int length, int insertee) {
+  int[] inserted = new int[length+1]{ i => -1 };
+  bool not_yet_inserted = true;
+  if (insertee < partial[0]) {
+    not_yet_inserted = false;
+    inserted[0] = insertee;
+  }
+  for (int i = 0; i < length; i = i + 1;) {
+    if (not_yet_inserted) {
+      if (insertee > partial[i]) { 
+        not_yet_inserted = false;
+        inserted[i+1] = insertee;
+        inserted[i] = partial[i];
+      } else {
+        inserted[i] = partial[i];
+      }
+    } else {
+      inserted[i+1] = partial[i];
+    }
+  }
+  return inserted;
+}
+
+int[] insort(int[] unsorted, int len) {
+  int[] out = new int[1]{ i => -2 };
+  out[0] = unsorted[0];
+  for (int i = 1; i < len; i = i + 1;) {
+    out = insert(out, i, unsorted[i]);
+  }
+  return out;
+}
+
+int program(int argc, string[] argv) {
+  int[] array = {13, 42, 32, 3, 2, 6};
+  int[] result = insort(array, 6);
+  return result[5];
+}

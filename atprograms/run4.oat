@@ -1,0 +1,6 @@
+int[] arr = null; 
+
+int program (int argc, string[] argv) {
+  arr = {17,42};
+  return arr[1];
+}

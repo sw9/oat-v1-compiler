@@ -1,0 +1,16 @@
+int program (int argc, string[] argv) {
+  int[][] x = {{1},{2},{3},{4}};
+  int ans = 0;
+
+  for(int i=0;i<4;i=i+1;) {
+    ans = x[i][0] - ans;
+  }
+
+  if((5 [&] ~5 [|] 0) != 0) {
+    return ans;
+  } else {
+    return -ans;
+  }
+
+  return ans;
+}

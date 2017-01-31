@@ -1,0 +1,26 @@
+int gcd(int a, int b) {
+  while (b != 0) {
+    int t = b;
+    b = mod(a, b);
+    a = t;
+  }
+
+  return a;
+}
+
+int mod (int a, int b) {
+  
+  int t = a;
+  while (t - b >= 0) {
+      t = t - b;
+  }
+
+  return t;
+}
+
+int program (int argc, string[] argv) {
+  int a = 64;
+  int b = 48;
+
+  return gcd(a, b);
+}

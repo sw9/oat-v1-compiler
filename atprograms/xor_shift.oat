@@ -1,0 +1,26 @@
+int xor (int x, int y) {
+	return ~(x [&] y) [&] (x [|] y);
+}
+
+int xor_shift_plus (int[] s) {
+	int x = s[0];
+	int y = s[1];
+
+	s[0] = y;
+	x = xor(x, x << 23);
+	x = xor(x, x >> 17);
+	x = xor(x, xor(y, y >> 26));
+	s[1] = x;
+
+	return x + y;
+}
+
+int program (int argc, string[] argv) {
+	int[] seed = new int[2]{ i => 100 * (i + 1) };
+
+	print_int(xor_shift_plus(seed));
+	print_string("\n");
+	print_int(xor_shift_plus(seed));
+
+	return 0;
+}
