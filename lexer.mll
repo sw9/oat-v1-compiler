@@ -76,10 +76,17 @@ let (symbol_table : (string, Parser.token) Hashtbl.t) = Hashtbl.create 1024
   let _ =
     List.iter (fun (str,t) -> Hashtbl.add symbol_table str t) reserved_words
 
+  let maybe_char = ref '0'
+
   let create_token lexbuf =
     let str = lexeme lexbuf in 
     try (Hashtbl.find symbol_table str) 
-    with _ -> IDENT str
+    with _ ->
+         match maybe_char with
+         | {contents = '0'} -> IDENT str
+         | {contents = c} ->
+           maybe_char := '0';
+           IDENT (String.make 1 c ^ str)
 
   (* Lexing comments and strings *)
   let string_buffer = ref (String.create 2048)
@@ -188,7 +195,7 @@ and multiarray typ = parse
   | whitespace+ { typ } 
   | "[]" {multiarray (Ast.no_loc (Ast.TRef (Ast.no_loc (Ast.RArray typ)))) lexbuf}
   | "[" {typ}
-  
+  | _ as c {maybe_char := c; typ}
 
 and directive state = parse
   | whitespace+ { directive state lexbuf } 

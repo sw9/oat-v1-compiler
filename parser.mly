@@ -15,7 +15,7 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token TRUE
 %token FALSE
 %token <string> IDENT
-%token <Ast.typ>TARRAY   /* array */
+%token <Ast.typ> TARRAY   /* array */
 
 %token TINT     /* int */
 %token TVOID    /* void */
@@ -60,16 +60,13 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a loc =
 %token TILDE    /* ~ */
 %token BANG     /* ! */
 
-                       
+
 %left BOR
 %left BAND
 %left LOR
 %left LAND
 %left EQEQ NEQ
-%left GREAT
-%left GREATEQ
-%left LESS
-%left LESSEQ
+%left LESS LESSEQ GREAT GREATEQ
 %left LLSHIFT LRSHIFT ARSHIFT
 %left PLUS DASH
 %left STAR
@@ -204,8 +201,7 @@ stmt:
   | RETURN SEMI           { loc $startpos $endpos @@ Ret(None) }
   | RETURN e=exp SEMI     { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  { loc $startpos $endpos @@ While(e, b) }
-  | FOR LPAREN SEMI* d=list(decl)  SEMI* e=exp SEMI s=stmt SEMI* RPAREN b=block  { loc $startpos
-  $endpos @@ For(d, Some e, Some s, b) }
+  | FOR LPAREN d=separated_list(COMMA, decl) SEMI e=option(exp) SEMI s=option(stmt) RPAREN b=block  { loc $startpos $endpos @@ For(d, e, s, b) }
 
 
 if_stmt:
