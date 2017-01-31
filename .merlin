@@ -1,0 +1,11 @@
+S .
+S util
+S x86
+S ll
+
+B _build
+B _build/x86
+B _build/util
+B _build/ll
+
+PKG unix str nums
