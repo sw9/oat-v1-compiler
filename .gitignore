@@ -1,7 +1,7 @@
-*
-!.gitignore
-!.git
-!lexer.mll
-!parser.mly
-!frontend.ml
-!providedtests.ml
+_build/
+main.byte
+main.native
+README.html
+.\#*
+\#*
+*~
